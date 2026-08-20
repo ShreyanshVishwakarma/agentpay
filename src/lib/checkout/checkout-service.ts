@@ -356,9 +356,44 @@ export async function confirmCheckout(sessionId: string): Promise<ConfirmOutcome
     };
   }
 
+  // Atomic claim: flip AWAITING_CONFIRMATION -> ORDER_CREATED exactly once.
+  // Concurrent confirmations lose this race and fall through to reuse.
+  const claim = await db.checkoutSession.updateMany({
+    where: { id: session.id, status: "AWAITING_CONFIRMATION" },
+    data: { status: "ORDER_CREATED" },
+  });
+
+  if (claim.count === 0) {
+    const current = await db.checkoutSession.findUnique({ where: { id: session.id } });
+    if (
+      current &&
+      (current.status === "ORDER_CREATED" || current.status === "PAYMENT_PENDING") &&
+      current.razorpayOrderId
+    ) {
+      await recordAuditEvent({
+        sessionId: session.id,
+        eventType: "DUPLICATE_SESSION_REUSED",
+        actor: "SYSTEM",
+        payload: { razorpayOrderId: current.razorpayOrderId, stage: "confirm_race" },
+      });
+      return {
+        kind: "order_created",
+        sessionId: session.id,
+        razorpay: await buildRazorpayInfo(current.razorpayOrderId, current),
+        reused: true,
+      };
+    }
+    return {
+      kind: "error",
+      code: "CONFIRMATION_REQUIRED",
+      message: `This checkout session is ${current?.status.toLowerCase() ?? "unknown"} and cannot be confirmed.`,
+    };
+  }
+
   const policy = await getPolicyConfig();
   if (policy.confirmationRequired !== true) {
     // Defensive: the seeded policy always requires confirmation today.
+    await revertClaim(session.id);
     return {
       kind: "error",
       code: "CONFIRMATION_REQUIRED",
@@ -386,6 +421,8 @@ export async function confirmCheckout(sessionId: string): Promise<ConfirmOutcome
       reused: false,
     };
   } catch (error) {
+    // Release the claim so the buyer can retry confirmation.
+    await revertClaim(session.id);
     return {
       kind: "error",
       code: "RAZORPAY_ORDER_CREATION_FAILED",
@@ -395,6 +432,14 @@ export async function confirmCheckout(sessionId: string): Promise<ConfirmOutcome
           : "Could not create the payment order. No charge has been made. Please try again.",
     };
   }
+}
+
+/** Release a failed confirmation claim back to AWAITING_CONFIRMATION. */
+async function revertClaim(sessionId: string): Promise<void> {
+  await db.checkoutSession.updateMany({
+    where: { id: sessionId, status: "ORDER_CREATED" },
+    data: { status: "AWAITING_CONFIRMATION" },
+  });
 }
 
 async function buildRazorpayInfo(
@@ -514,33 +559,17 @@ export async function verifyPayment(params: {
     };
   }
 
-  try {
-    await db.$transaction(async (tx) => {
-      // Guarded stock decrement — rolls back if any line lost its race.
-      for (const item of session.items) {
-        const updated = await tx.catalogItem.updateMany({
-          where: { sku: item.sku, stock: { gte: item.quantity }, active: true },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (updated.count !== 1) {
-          throw new Error(`Insufficient stock at fulfillment for ${item.sku}`);
-        }
-      }
+  const fulfillment = await fulfillVerifiedPayment({
+    sessionId: session.id,
+    razorpayPaymentId: params.razorpayPaymentId,
+    signature: params.signature,
+  });
 
-      await tx.checkoutSession.update({
-        where: { id: session.id },
-        data: {
-          status: "PAYMENT_VERIFIED",
-          razorpayPaymentId: params.razorpayPaymentId,
-          razorpaySignature: params.signature,
-        },
-      });
-    });
-  } catch (error) {
+  if (!fulfillment.ok) {
     await markPaymentFailed(
       session.id,
       "PAYMENT_VERIFICATION_FAILED",
-      error instanceof Error ? error.message : "Fulfillment transaction failed",
+      fulfillment.reason,
     );
     return {
       verified: false,
@@ -568,6 +597,63 @@ export async function verifyPayment(params: {
     status: "PAYMENT_VERIFIED",
     razorpayPaymentId: params.razorpayPaymentId,
   };
+}
+
+export interface FulfillmentResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Atomically mark a payment verified and decrement stock.
+ *
+ * Shared by the browser-callback verification path and the webhook pipeline:
+ * guarded stock decrements + status transition happen in one transaction that
+ * rolls back completely if any line can no longer be fulfilled. Safe to call
+ * at most once per (session, paymentId); callers must handle idempotency.
+ */
+export async function fulfillVerifiedPayment(params: {
+  sessionId: string;
+  razorpayPaymentId: string;
+  signature: string;
+}): Promise<FulfillmentResult> {
+  const session = await db.checkoutSession.findUnique({
+    where: { id: params.sessionId },
+    include: { items: true },
+  });
+  if (!session) {
+    return { ok: false, reason: "Checkout session not found" };
+  }
+
+  try {
+    await db.$transaction(async (tx) => {
+      // Guarded stock decrement — rolls back if any line lost its race.
+      for (const item of session.items) {
+        const updated = await tx.catalogItem.updateMany({
+          where: { sku: item.sku, stock: { gte: item.quantity }, active: true },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (updated.count !== 1) {
+          throw new Error(`Insufficient stock at fulfillment for ${item.sku}`);
+        }
+      }
+
+      await tx.checkoutSession.update({
+        where: { id: session.id },
+        data: {
+          status: "PAYMENT_VERIFIED",
+          razorpayPaymentId: params.razorpayPaymentId,
+          razorpaySignature: params.signature,
+        },
+      });
+    });
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Fulfillment transaction failed",
+    };
+  }
 }
 
 async function markPaymentFailed(
