@@ -1,0 +1,97 @@
+// AgentPay — Prisma schema (SQLite)
+//
+// NOTE ON ENUMS: SQLite does not support native enums in Prisma.
+// `status` and `actor` are stored as strings and validated with Zod
+// schemas in src/schemas/*.ts which act as the single source of truth.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model CatalogItem {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  description String
+  pricePaise  Int
+  currency    String   @default("INR")
+  stock       Int
+  active      Boolean  @default(true)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checkoutItems CheckoutItem[]
+
+  @@index([active])
+}
+
+model CheckoutSession {
+  id                String   @id @default(cuid())
+  cartHash          String
+  status            String   @default("DRAFT")
+  totalPaise        Int
+  currency          String   @default("INR")
+  buyerBudgetPaise  Int?
+  razorpayOrderId   String?  @unique
+  razorpayPaymentId String?  @unique
+  razorpaySignature String?
+  rejectionReason   String?
+  rejectionDetails  Json?
+  idempotencyKey    String   @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  items       CheckoutItem[]
+  auditEvents AuditEvent[]
+
+  @@index([cartHash])
+  @@index([status])
+  @@index([cartHash, status])
+}
+
+model CheckoutItem {
+  id             String @id @default(cuid())
+  sessionId      String
+  catalogItemId  String
+  sku            String
+  itemName       String
+  unitPricePaise Int
+  quantity       Int
+  lineTotalPaise Int
+
+  session     CheckoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  catalogItem CatalogItem     @relation(fields: [catalogItemId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+}
+
+model AuditEvent {
+  id           String   @id @default(cuid())
+  sessionId    String
+  eventType    String
+  actor        String
+  payload      Json
+  previousHash String?
+  eventHash    String
+  createdAt    DateTime @default(now())
+
+  session CheckoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
+}
+
+model PolicyConfig {
+  id                   String   @id @default(cuid())
+  maxOrderPaise        Int      @default(100000)
+  maxItemsPerOrder     Int      @default(5)
+  confirmationRequired Boolean  @default(true)
+  merchantName         String
+  updatedAt            DateTime @updatedAt
+}
