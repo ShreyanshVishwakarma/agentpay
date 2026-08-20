@@ -116,31 +116,33 @@ export function AgentWorkspace() {
       setAuditEvents([]);
       setMode(null);
 
-      let parsed: InterpretOk;
+      let intent: PurchaseIntent;
+      let mode: "llm" | "fallback";
       try {
-        parsed = await postJson<InterpretOk | { error: { message: string } }>(
-          "/api/agent/interpret",
-          { message },
-        );
+        const parsed = await postJson<
+          InterpretOk | { error: { message: string } }
+        >("/api/agent/interpret", { message });
         if ("error" in parsed) {
           setParseError(parsed.error.message);
           setPhase("idle");
           return;
         }
+        intent = parsed.intent;
+        mode = parsed.mode;
       } catch {
         setParseError("Could not reach the agent service. Please try again.");
         setPhase("idle");
         return;
       }
 
-      setIntent(parsed.intent);
-      setMode(parsed.mode);
+      setIntent(intent);
+      setMode(mode);
 
       setPhase("previewing");
       try {
         const outcome = await postJson<
           PreviewApproved | PreviewRejected | { error: { message: string } }
-        >("/api/checkout/preview", { intent: parsed.intent, sourceMessage: message });
+        >("/api/checkout/preview", { intent, sourceMessage: message });
 
         if ("error" in outcome) {
           setParseError(outcome.error.message);

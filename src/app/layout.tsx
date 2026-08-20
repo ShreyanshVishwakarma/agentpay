@@ -19,7 +19,11 @@ export const metadata: Metadata = {
     "AgentPay turns buyer intent into bounded, explainable Razorpay test-mode transactions.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"

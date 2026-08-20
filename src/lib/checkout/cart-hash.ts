@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { stableStringify, sha256Hex } from "@/lib/hash-utils";
 import { POLICY_VERSION } from "@/lib/policy-version";
 import type { CartItem } from "@/schemas/agent";

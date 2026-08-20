@@ -1,0 +1,25 @@
+
+> agentpay@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.96.1:3000
+- Environments: .env
+✓ Ready in 5.8s
+✓ Running next.config.ts took 248ms
+
+ GET /api/catalog 200 in 1585ms (next.js: 1290ms, application-code: 295ms)
+ POST /api/agent/interpret 200 in 361ms (next.js: 344ms, application-code: 17ms)
+ POST /api/checkout/preview 200 in 430ms (next.js: 356ms, application-code: 73ms)
+ POST /api/checkout/confirm 409 in 363ms (next.js: 336ms, application-code: 27ms)
+ POST /api/checkout/preview 200 in 41ms (next.js: 3ms, application-code: 38ms)
+ POST /api/checkout/preview 200 in 43ms (next.js: 3ms, application-code: 40ms)
+ GET /api/audit/cmt23f0i30007g4rmoukxjtwr 200 in 1136ms (next.js: 1126ms, application-code: 10ms)
+ POST /api/checkout/preview 200 in 48ms (next.js: 8ms, application-code: 40ms)
+○ Compiling / ...
+ GET / 200 in 5.1s (next.js: 4.9s, application-code: 188ms)
+ GET /buy 200 in 601ms (next.js: 532ms, application-code: 69ms)
+ GET /merchant/catalog 200 in 523ms (next.js: 447ms, application-code: 76ms)
+ GET /architecture 200 in 214ms (next.js: 161ms, application-code: 54ms)
+ GET /audit/cmt23f0i30007g4rmoukxjtwr 200 in 898ms (next.js: 827ms, application-code: 71ms)
