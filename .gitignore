@@ -46,3 +46,6 @@ dev.db
 
 # prisma generated client
 /src/generated
+
+# local logs
+*.log
