@@ -569,7 +569,7 @@ export async function verifyPayment(params: {
     await markPaymentFailed(
       session.id,
       "PAYMENT_VERIFICATION_FAILED",
-      fulfillment.reason,
+      fulfillment.reason ?? "Fulfillment transaction failed",
     );
     return {
       verified: false,

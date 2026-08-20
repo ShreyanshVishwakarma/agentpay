@@ -16,11 +16,11 @@ AI buyers are about to shop on behalf of humans, but merchants have no safe way 
 
 ## Solution overview
 
-AgentPay is a merchant-side checkout agent with one rule baked into its architecture:
+AgentPay is a merchant-side checkout agent — a **constrained commerce execution layer for AI buyers** — with one rule baked into its architecture:
 
 > **LLM proposes. Deterministic policy engine decides. User approves. Razorpay executes.**
 
-A buyer types *"Buy two SQL Pro Interview Packs under ₹800"*. The LLM only extracts structured intent (SKUs, quantities, budget). A deterministic server-side policy engine validates it against the real catalog, recalculates every rupee from database prices in integer paise, and explains its decision. Nothing reaches Razorpay until the buyer clicks **Create test checkout**, and a payment is only "verified" after the server recomputes the Razorpay HMAC signature. Every step lands in a tamper-evident, hash-chained audit trail.
+A buyer types *"Buy two SQL Pro Interview Packs under ₹800"*. The LLM only extracts structured intent (SKUs, quantities, budget). A deterministic server-side policy engine validates it against the real catalog, recalculates every rupee from database prices in integer paise, and explains its decision. Nothing reaches Razorpay until the buyer clicks **Create test checkout**, and a payment is only "verified" after the server recomputes the Razorpay HMAC signature — confirmed through a signature-verified, idempotent webhook pipeline in which the same payment event can never update inventory twice. Every step lands in a tamper-evident, hash-chained audit trail.
 
 ## Architecture
 
@@ -80,7 +80,46 @@ The LLM can never decide price, bypass inventory, skip confirmation, create an o
 
 ## Tech stack
 
-Next.js 16 (App Router, Turbopack) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui · Prisma 7 + SQLite (driver adapter: `better-sqlite3`) · Zod 4 · Razorpay REST API · OpenAI-compatible chat completions · Lucide icons
+Next.js 16 (App Router, Turbopack) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui · Prisma 7 + SQLite (driver adapter: `better-sqlite3`) · Zod 4 · Razorpay REST API · OpenAI-compatible chat completions · Lucide icons · Vitest
+
+## Verification
+
+```bash
+npm run test          # vitest: unit + integration suites (66 tests)
+npm run test:watch    # watch mode
+npm run typecheck     # tsc --noEmit
+npm run lint          # eslint
+npm run test:security # standalone chain-tamper + HMAC self-tests
+npm run build         # production build
+```
+
+The integration suite runs against an isolated `prisma/test.db` (migrated fresh by `tests/global-setup.ts`) with a **mocked Razorpay gateway**, and covers:
+
+- every policy rejection code (`SKU_NOT_FOUND`, `ITEM_INACTIVE`, `OUT_OF_STOCK`, `ITEM_LIMIT_EXCEEDED`, `BUDGET_EXCEEDED`, `MERCHANT_ORDER_LIMIT_EXCEEDED`, invalid quantities)
+- full lifecycle: preview → confirm → signature verification → atomic stock decrement
+- forged signatures, cross-order callbacks, double verification (idempotent)
+- **duplicate confirmation race**: three concurrent confirms create exactly one Razorpay order
+- stock exhausted between preview and confirm → safe rejection at confirm time
+- webhook pipeline: fulfillment, replay dedup, amount-mismatch rejection, `payment.failed` handling, browser-callback/webhook idempotency
+
+## Webhook pipeline (authoritative payment confirmation)
+
+The browser checkout callback improves UX, but AgentPay treats **server-to-server webhooks as the authoritative payment ledger**:
+
+```
+POST /api/webhooks/razorpay
+  ├─ HMAC-SHA256 over the RAW body vs RAZORPAY_WEBHOOK_SECRET (timing-safe)
+  ├─ delivery stored in a WebhookEvent inbox keyed by x-razorpay-event-id
+  ├─ redeliveries → 200 { duplicate: true } — never re-processed
+  └─ payment.captured / order.paid / payment.failed routed idempotently:
+       • amount checked against the policy-approved session total
+       • fulfillment reuses the same atomic stock-decrement transaction
+         as the browser-callback path — a payment can fulfil stock once
+       • every delivery appends audit events (RAZORPAY_WEBHOOK_VERIFIED,
+         PAYMENT_VERIFIED_VIA_WEBHOOK / PAYMENT_MARKED_FAILED)
+```
+
+Configure the webhook URL (`https://<your-domain>/api/webhooks/razorpay`) and secret in the Razorpay Dashboard → Settings → Webhooks. The user-facing flow states "Payment submitted — verifying payment" until either path confirms; both paths are mutually idempotent.
 
 ## Local setup
 
@@ -103,6 +142,7 @@ DATABASE_URL="file:./dev.db"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 RAZORPAY_KEY_ID="rzp_test_xxxxxxxxx"
 RAZORPAY_KEY_SECRET="xxxxxxxxx"
+RAZORPAY_WEBHOOK_SECRET=""   # optional — enables the webhook pipeline
 OPENAI_API_KEY=""            # optional — empty uses local fallback parser
 OPENAI_MODEL="gpt-4o-mini"   # optional
 ```
@@ -177,9 +217,9 @@ scripts/        # verify-security-logic.ts (chain + HMAC self-tests)
 
 - Single merchant, single buyer, no auth — by design for the MVP scope.
 - In-memory rate limiter and audit-chain writes are per-instance; production would use Redis and transactional outbox patterns.
-- Razorpay webhook handling (`payment.captured`) is not implemented; verification relies on the browser callback reaching the server.
 - Stock decrements only on verified payment; abandoned `ORDER_CREATED` sessions need an expiry sweeper (`EXPIRED` status exists but nothing transitions to it yet).
-- LLM intent parsing supports one OpenAI-compatible provider; multi-provider routing and streaming are future work.
+- LLM intent parsing supports one OpenAI-compatible provider; multi-provider routing, prompt-injection hardening, and model-version metadata in audit events are next steps.
+- Production roadmap: PostgreSQL with managed backups, Redis-backed distributed rate limiting, atomic stock *reservation* with expiry, structured logs with trace IDs, merchant/buyer auth with RBAC, secret manager integration.
 
 ## Screenshots
 

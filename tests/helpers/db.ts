@@ -70,4 +70,5 @@ export async function clearSessions(): Promise<void> {
   await db.auditEvent.deleteMany();
   await db.checkoutItem.deleteMany();
   await db.checkoutSession.deleteMany();
+  await db.webhookEvent.deleteMany();
 }

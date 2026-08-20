@@ -32,6 +32,10 @@ export const AUDIT_EVENT_TYPES = [
   "PAYMENT_SIGNATURE_VERIFIED",
   "PAYMENT_SIGNATURE_REJECTED",
   "PAYMENT_MARKED_FAILED",
+  "RAZORPAY_WEBHOOK_VERIFIED",
+  "RAZORPAY_WEBHOOK_REJECTED",
+  "WEBHOOK_EVENT_DUPLICATE",
+  "PAYMENT_VERIFIED_VIA_WEBHOOK",
 ] as const;
 
 export const auditEventTypeSchema = z.enum(AUDIT_EVENT_TYPES);
@@ -56,6 +60,10 @@ export const AUDIT_EVENT_SUMMARIES: Record<AuditEventType, string> = {
   PAYMENT_SIGNATURE_VERIFIED: "Payment signature verified server-side",
   PAYMENT_SIGNATURE_REJECTED: "Payment signature failed verification",
   PAYMENT_MARKED_FAILED: "Payment marked as failed; no fulfillment",
+  RAZORPAY_WEBHOOK_VERIFIED: "Razorpay webhook received with valid signature",
+  RAZORPAY_WEBHOOK_REJECTED: "Webhook rejected — signature verification failed",
+  WEBHOOK_EVENT_DUPLICATE: "Duplicate webhook delivery ignored (already processed)",
+  PAYMENT_VERIFIED_VIA_WEBHOOK: "Payment verified and fulfilled via webhook pipeline",
 };
 
 export interface RecordAuditEventInput {

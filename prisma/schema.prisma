@@ -95,3 +95,17 @@ model PolicyConfig {
   merchantName         String
   updatedAt            DateTime @updatedAt
 }
+
+/// Server-to-server payment events from Razorpay. The unique eventId makes
+/// redeliveries idempotent: the same webhook can never fulfil stock twice.
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  eventType   String
+  payload     Json
+  status      String    @default("RECEIVED")
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([eventType])
+}

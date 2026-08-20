@@ -22,3 +22,18 @@ export const verifyPaymentResponseSchema = z.object({
 });
 
 export type VerifyPaymentResponse = z.infer<typeof verifyPaymentResponseSchema>;
+
+/** Envelope of a Razorpay webhook delivery. */
+export const razorpayWebhookEnvelopeSchema = z.object({
+  event: z.string().min(1),
+});
+
+/** The payment entity embedded in payment.* / order.* webhook events. */
+export const razorpayPaymentEntitySchema = z.object({
+  id: z.string().min(1),
+  order_id: z.string().min(1),
+  amount: z.number().int().nonnegative(),
+  status: z.string(),
+});
+
+export type RazorpayPaymentEntity = z.infer<typeof razorpayPaymentEntitySchema>;

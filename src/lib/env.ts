@@ -19,6 +19,10 @@ const envSchema = z.object({
     .string()
     .default("")
     .transform((value) => value.trim()),
+  RAZORPAY_WEBHOOK_SECRET: z
+    .string()
+    .default("")
+    .transform((value) => value.trim()),
   OPENAI_API_KEY: z
     .string()
     .default("")
@@ -43,5 +47,7 @@ export const env = parsed.data;
 
 export const razorpayConfigured =
   env.RAZORPAY_KEY_ID.length > 0 && env.RAZORPAY_KEY_SECRET.length > 0;
+
+export const razorpayWebhookConfigured = env.RAZORPAY_WEBHOOK_SECRET.length > 0;
 
 export const llmConfigured = env.OPENAI_API_KEY.length > 0;
