@@ -1,230 +1,160 @@
-# AgentPay
+# AgentPay — Commerce Control Plane
 
-**Safe AI checkout for the agentic web.** AgentPay turns buyer intent into bounded, explainable Razorpay test-mode transactions.
+**The control plane for safe AI commerce.** AgentPay lets businesses safely expose products to AI buyers, control autonomous purchase behavior, recover failed payment intent, and measure the revenue impact of agentic commerce.
 
 > **Razorpay Hackathon — Track 01: AI Growth & Agentic Commerce**
 
+**Positioning:** AI agents can discover, recommend, and prepare purchases. They cannot spend money, create a payment order, or fulfil inventory without deterministic merchant controls and a verifiable event trail.
+
 ---
 
-## Problem statement
+## What makes AgentPay different?
 
-AI buyers are about to shop on behalf of humans, but merchants have no safe way to let them pay:
-
-- An LLM that can *directly* create orders or set prices is an untrusted actor holding the money keys.
-- Buyers won't authorize agents they can't audit.
-- Merchants need hard guarantees: no order without explicit consent, no payment without server-side verification, no silent policy violations.
-
-## Solution overview
-
-AgentPay is a merchant-side checkout agent — a **constrained commerce execution layer for AI buyers** — with one rule baked into its architecture:
-
-> **LLM proposes. Deterministic policy engine decides. User approves. Razorpay executes.**
-
-A buyer types *"Buy two SQL Pro Interview Packs under ₹800"*. The LLM only extracts structured intent (SKUs, quantities, budget). A deterministic server-side policy engine validates it against the real catalog, recalculates every rupee from database prices in integer paise, and explains its decision. Nothing reaches Razorpay until the buyer clicks **Create test checkout**, and a payment is only "verified" after the server recomputes the Razorpay HMAC signature — confirmed through a signature-verified, idempotent webhook pipeline in which the same payment event can never update inventory twice. Every step lands in a tamper-evident, hash-chained audit trail.
+- **AI proposes but cannot spend.** The LLM only extracts intent through a strict Zod schema; it never sets prices, overrides inventory, creates orders, or declares success.
+- **Merchants define machine-enforceable commerce policies.** Versioned rules bound order value, quantity, catalog access, agent authority and budgets — evaluated deterministically on every preview *and* confirmation.
+- **Every payment is server-verified.** Browser popup "success" proves nothing; HMAC-SHA256 signatures are recomputed server-side with timing-safe comparison.
+- **Webhook events are idempotent.** A signature-verified inbox keyed by event id means the same payment can never update inventory twice.
+- **Unsafe revenue is prevented, not merely detected.** Out-of-policy carts are blocked before a payment screen exists — and the prevented value is measured.
+- **Recoverable revenue gets bounded, merchant-approved intervention.** Failed intent is recovered through deterministic rules with stopping limits — no spam, no dark patterns.
+- **Every decision is auditable.** A SHA-256 hash chain makes history tamper-evident; one click re-verifies it.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A["Buyer Prompt<br/>(natural language)"] --> B["AI Intent Parser<br/><i>untrusted · Zod-gated</i>"]
-    B --> C["Policy Engine<br/><i>deterministic rules</i>"]
-    C -->|reject| Z["Rejection + reason<br/>no order created"]
+    A["Buyer Intent<br/>(natural language)"] --> B["AI Intent Parser<br/><i>untrusted · Zod-gated</i>"]
+    B --> C["Merchant Policy Engine<br/><i>versioned · deterministic</i>"]
+    C -->|block| Z["Rejection + reason code<br/>revenue protected"]
     C -->|approve| D["Checkout Preview<br/>AWAITING_CONFIRMATION"]
     D --> E["Buyer Confirmation<br/><i>explicit gate</i>"]
     E --> F["Razorpay Orders API<br/><i>server-side · test mode</i>"]
-    F --> G["Standard Checkout<br/>(browser)"]
-    G --> H["Signature Verification<br/><i>HMAC-SHA256 · timing-safe</i>"]
-    H -->|valid| I["PAYMENT_VERIFIED<br/>stock decremented atomically"]
-    H -->|invalid| J["PAYMENT_FAILED<br/>no fulfillment"]
-    I & J & Z --> K[("Audit Trail<br/><i>SHA-256 hash chain</i>")]
+    F --> G["Standard Checkout"]
+    G --> H["Signature Verification<br/><i>HMAC · timing-safe</i>"]
+    F -.-> W["Webhook Inbox<br/><i>idempotent by event id</i>"]
+    H --> I["Atomic Fulfilment<br/>stock decremented once"]
+    W --> I
+    I --> K[("Audit Hash Chain")]
+    H -->|invalid| J["PAYMENT_FAILED → Recovery Queue"]
+    J --> R["Merchant-approved recovery<br/>(bounded interventions)"]
+    R -.-> E
+    Z & I & J & K --> S["Insights: funnel, protected,<br/>at-risk, recovered revenue"]
 ```
 
-Every arrow into the audit store is append-only: `eventHash = SHA-256(previousHash | canonicalEvent)`.
+## Product surfaces
 
-## Product flow
+| Surface | Route | Audience |
+|---|---|---|
+| Agent Checkout | `/buy` | Buyer / AI agent |
+| Merchant Overview | `/merchant` | Merchant |
+| Catalog (+ access controls) | `/merchant/catalog` | Merchant |
+| Policy Studio + Simulator | `/merchant/policies` | Merchant |
+| Revenue Opportunities | `/merchant/insights` | Merchant |
+| Recovery Queue / Case detail | `/merchant/recovery`, `/merchant/recovery/[caseId]` | Merchant |
+| Audit Trail (list + per session) | `/merchant/audit`, `/audit/[sessionId]` | Both |
+| Buyer recovery page | `/recover/[caseId]` | Buyer (simulated) |
+| Architecture | `/architecture` | Everyone |
 
-1. Buyer submits natural language on `/buy`.
-2. `POST /api/agent/interpret` → structured intent (`mode: "llm"` or `"fallback"`).
-3. `POST /api/checkout/preview` → policy evaluation, server-calculated total, transparent explanation — or a machine-readable rejection.
-4. Buyer reviews line items, total, remaining budget, and the policy checklist.
-5. Buyer clicks **Create test checkout** → `POST /api/checkout/confirm` re-runs all policies against live inventory, then creates a Razorpay test-mode Order.
-6. Razorpay Standard Checkout opens; the success callback posts to `POST /api/payments/verify`.
-7. The server verifies the HMAC signature, marks `PAYMENT_VERIFIED`, and decrements stock atomically.
-8. Every event above is hash-chained and viewable at `/audit/[sessionId]`.
-
-## Safety model
+## Payment safety model
 
 | Stage | Who decides | Guarantee |
 |---|---|---|
-| Intent extraction | LLM proposes | Output must pass strict Zod schema; hallucinated SKUs discarded |
-| Pricing | Code decides | Only DB catalog prices, integer paise, recomputed at preview *and* confirm |
+| Intent extraction | LLM proposes | Strict Zod schema; hallucinated SKUs discarded |
+| Pricing & eligibility | Code decides | DB prices in integer paise, recomputed at preview *and* confirm |
 | Approval | User confirms | No Razorpay order exists before an explicit click |
 | Execution | Razorpay processes | Test-mode Orders API, amount from persisted session total |
-| Settlement | Server verifies | HMAC-SHA256 + timing-safe compare before fulfillment |
+| Settlement | Server verifies | Checkout HMAC **and** idempotent webhook inbox |
+| Fulfilment | One atomic transaction | Guarded stock decrement rolls back on any race |
 
-The LLM can never decide price, bypass inventory, skip confirmation, create an order, or mark a payment successful.
+## Merchant policy engine
 
-## Features
+Policies are **versioned rows** (`MerchantPolicy.policyVersion`); every save creates a new immutable version, supersedes the old one, and appends `POLICY_CHANGED` (old values, new values, actor) to the global audit chain. Historical checkouts are never re-evaluated.
 
-- Natural-language purchase intent parsing (OpenAI-compatible LLM **or** deterministic local fallback with visible "AI fallback mode" badge)
-- Deterministic policy engine with 13 machine-readable rejection codes
-- Server-exclusive pricing in integer paise (₹399 = `39900`)
-- Transparent checkout preview with human-readable policy explanations
-- Explicit confirmation gate with duplicate-submission protection
-- Application-level duplicate-order protection via canonical cart hashing
-- Razorpay Standard Checkout (test mode) launched client-side after a valid Order
-- Server-side signature verification with `timingSafeEqual`
-- Tamper-evident, hash-chained audit trail with one-click chain verification
-- Merchant catalog page + agent-readable `GET /api/catalog` JSON endpoint
-- Graceful degradation: no Razorpay keys → "Demo payment mode unavailable", previews/rejections/audit still work; no OpenAI key → fallback parser
+Enforced rule families:
 
-## Tech stack
+1. **Transaction:** max order value, max quantity per item, max items per cart, confirmation gate, currency, session expiry minutes.
+2. **Catalog access:** per-product *discoverable / purchasable / paused* toggles, per-product AI quantity caps. Hidden products vanish from `GET /api/catalog`; paused/human-only products reject with `CATALOG_ACCESS_PAUSED` / `AGENT_PURCHASE_NOT_ALLOWED`.
+3. **Agent authority:** recommend / prepare-checkout / bundle-discount toggles. Autonomous payment execution is hard-disabled by design.
+4. **Budgets:** default buyer budget, max agent-proposed cart value, extra-confirmation threshold, daily test-mode cap.
+5. **Risk & recovery:** attempts per session, checkouts per cart hash, cooling-off windows, low-stock review threshold, recovery enablement + attempt cap.
 
-Next.js 16 (App Router, Turbopack) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui · Prisma 7 + SQLite (driver adapter: `better-sqlite3`) · Zod 4 · Razorpay REST API · OpenAI-compatible chat completions · Lucide icons · Vitest
+Rejection codes include the exact responsible control, e.g. `catalog_access.paused`, `budget.daily_test_mode_cap`.
 
-## Verification
+### Policy simulator
+
+`POST /api/merchant/policy/simulate` dry-runs seeded scenarios against the current policy and names the blocking control. Simulations create **no sessions and no orders** (covered by tests).
+
+## Opportunity analytics definitions
+
+- **Revenue verified** — Σ totals of `PAYMENT_VERIFIED` sessions.
+- **Revenue protected** — Σ attempted cart values of policy rejections (budget, stock, quantity, access). Successful payments are never counted here.
+- **Revenue at risk** — Σ totals of failed / expired / abandoned-after-confirmation sessions eligible for recovery.
+- **Recovery conversion rate** — recovered cases ÷ recovery-eligible cases.
+- **Funnel** — intent received → cart previewed → buyer confirmed → order created → payment verified, with per-stage conversion and drop-off.
+
+## Revenue recovery flow
+
+1. Deterministic scan maps failed/expired/abandoned/budget-blocked/out-of-stock sessions onto one bounded intervention (`src/lib/recovery/intervention-engine.ts` — pure rules, no LLM).
+2. Cases enter the queue as proposals (`RECOVERY_CASE_CREATED`, `RECOVERY_PROPOSED`).
+3. **Nothing contacts the buyer until a merchant approves.** Approval executes an in-app simulation with guardrail-checked copy (`RECOVERY_APPROVED`, `RECOVERY_EXECUTED`).
+4. The buyer sees `/recover/[caseId]`: resume original checkout, accept an allowed alternative, or decline.
+5. Any resumed checkout re-runs the full pipeline — policies, explicit confirmation, test-mode order, signature verification/webhooks, atomic fulfilment — then closes the loop (`RECOVERY_SUCCEEDED`).
+6. Stopping rules: ≤ 2 attempts (policy-configurable), merchant kill-switch, closed cases immutable, stock must satisfy the request, 14-day case window.
+
+## Webhook idempotency model
+
+`POST /api/webhooks/razorpay` verifies HMAC-SHA256 over the **raw body**, stores each delivery in a `WebhookEvent` inbox keyed by `x-razorpay-event-id`, and answers redeliveries with `{duplicate: true}` without re-processing. Captured payments are amount-checked against the policy-approved total before sharing the same atomic fulfilment transaction as the browser-callback path.
+
+## Audit hash-chain model
+
+`eventHash = SHA-256(previousHash ?? "" | canonicalJson(sessionId?, eventType, actor, payload))`. Session events form per-session chains; merchant-level events (policy changes, simulations) form a global chain. Canonicalization sorts keys recursively. Timestamps are excluded from hashed material to avoid datetime-precision instability — content tampering or deletion still breaks every later link. Payloads pass a secret-redaction filter as defense-in-depth.
+
+## Testing strategy
 
 ```bash
-npm run test          # vitest: unit + integration suites (66 tests)
-npm run test:watch    # watch mode
-npm run typecheck     # tsc --noEmit
+npm run test          # 113 unit + integration tests (Vitest)
+npm run typecheck     # tsc --noEmit (strict)
 npm run lint          # eslint
-npm run test:security # standalone chain-tamper + HMAC self-tests
 npm run build         # production build
+npm run test:security # standalone chain-tamper + HMAC self-tests
 ```
 
-The integration suite runs against an isolated `prisma/test.db` (migrated fresh by `tests/global-setup.ts`) with a **mocked Razorpay gateway**, and covers:
+Integration tests run against an isolated `prisma/test.db` (fresh migrations via `tests/global-setup.ts`) with a **mocked Razorpay gateway**. Coverage highlights: every rejection code incl. new access/daily-cap rules; duplicate-confirmation race (3 concurrent confirms → exactly 1 order); forged signatures; webhook replay dedup; policy versioning + simulation purity; funnel/revenue math in paise; full recovery lifecycle incl. stopping rules and "duplicate webhook cannot fulfil twice"; recovery-copy guardrails (no invented prices, urgency, discounts, or payment-status claims).
 
-- every policy rejection code (`SKU_NOT_FOUND`, `ITEM_INACTIVE`, `OUT_OF_STOCK`, `ITEM_LIMIT_EXCEEDED`, `BUDGET_EXCEEDED`, `MERCHANT_ORDER_LIMIT_EXCEEDED`, invalid quantities)
-- full lifecycle: preview → confirm → signature verification → atomic stock decrement
-- forged signatures, cross-order callbacks, double verification (idempotent)
-- **duplicate confirmation race**: three concurrent confirms create exactly one Razorpay order
-- stock exhausted between preview and confirm → safe rejection at confirm time
-- webhook pipeline: fulfillment, replay dedup, amount-mismatch rejection, `payment.failed` handling, browser-callback/webhook idempotency
-
-## Webhook pipeline (authoritative payment confirmation)
-
-The browser checkout callback improves UX, but AgentPay treats **server-to-server webhooks as the authoritative payment ledger**:
-
-```
-POST /api/webhooks/razorpay
-  ├─ HMAC-SHA256 over the RAW body vs RAZORPAY_WEBHOOK_SECRET (timing-safe)
-  ├─ delivery stored in a WebhookEvent inbox keyed by x-razorpay-event-id
-  ├─ redeliveries → 200 { duplicate: true } — never re-processed
-  └─ payment.captured / order.paid / payment.failed routed idempotently:
-       • amount checked against the policy-approved session total
-       • fulfillment reuses the same atomic stock-decrement transaction
-         as the browser-callback path — a payment can fulfil stock once
-       • every delivery appends audit events (RAZORPAY_WEBHOOK_VERIFIED,
-         PAYMENT_VERIFIED_VIA_WEBHOOK / PAYMENT_MARKED_FAILED)
-```
-
-Configure the webhook URL (`https://<your-domain>/api/webhooks/razorpay`) and secret in the Razorpay Dashboard → Settings → Webhooks. The user-facing flow states "Payment submitted — verifying payment" until either path confirms; both paths are mutually idempotent.
-
-## Local setup
+## Local development
 
 ```bash
 npm install
-npx prisma migrate dev     # creates SQLite db + applies migration
-npx prisma generate        # generates the Prisma Client (v7: explicit)
-npx prisma db seed         # seeds merchant, catalog, policy config
-npm run dev                # http://localhost:3000
+npx prisma migrate dev && npx prisma generate && npx prisma db seed
+npm run dev            # http://localhost:3000
 ```
 
-> Prisma 7 note: `prisma migrate` no longer auto-runs `generate`/`seed`, and the datasource URL lives in `prisma.config.ts`.
+Environment (see `.env.example`): `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` (test keys; empty → "Demo payment mode unavailable"), `RAZORPAY_WEBHOOK_SECRET` (optional), `OPENAI_API_KEY`/`OPENAI_MODEL` (optional; empty → deterministic fallback parser and template recovery copy).
 
-## Environment variables
+Demo data: `npx prisma db seed` rebuilds 40+ synthetic sessions, recovery cases across all lifecycle stages, and webhook evidence. `POST /api/merchant/demo/reset` does the same at runtime.
 
-Copy `.env.example` to `.env`:
+## Threat model (summary)
 
-```bash
-DATABASE_URL="file:./dev.db"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-RAZORPAY_KEY_ID="rzp_test_xxxxxxxxx"
-RAZORPAY_KEY_SECRET="xxxxxxxxx"
-RAZORPAY_WEBHOOK_SECRET=""   # optional — enables the webhook pipeline
-OPENAI_API_KEY=""            # optional — empty uses local fallback parser
-OPENAI_MODEL="gpt-4o-mini"   # optional
-```
-
-Both integrations degrade gracefully when keys are empty.
-
-## Testing Razorpay test mode
-
-1. Get test keys from the [Razorpay Dashboard](https://dashboard.razorpay.com) → Settings → API Keys (Test mode).
-2. Put them in `.env`, restart `npm run dev`.
-3. On `/buy`, run the success prompt below and confirm.
-4. In the Razorpay test window, use [test card `4111 1111 1111 1111`](https://razorpay.com/docs/payments/payments/test-card-details/), any future expiry/CVV, or the test UPI IDs.
-5. Watch the status move through *Payment submitted → Verifying payment → Payment verified*, then inspect the full audit trail.
-
-Without keys, confirm shows **"Demo payment mode unavailable"** — previews, rejections, and audit still function.
-
-## Demo prompts
-
-| Prompt | Outcome |
+| Threat | Mitigation |
 |---|---|
-| `Buy two SQL Pro Interview Packs under ₹800` | Approved — ₹798.00 total, ₹2.00 under budget |
-| `Get the Next.js Backend Pack` | Approved — ₹499.00 |
-| `Buy three SQL Pro Packs under ₹800` | Rejected — `BUDGET_EXCEEDED` |
-| `Buy the Premium Interview Bundle` | Rejected — `OUT_OF_STOCK` |
+| LLM invents prices/SKUs or exceeds authority | Zod-gated intent; SKU allowlist; policy engine recomputes everything |
+| Client tampers with totals/stock/status | All money state read from DB; requests carry only SKUs/quantities/session ids |
+| Forged payment callback | Server-side HMAC + timing-safe compare; order-id binding to session |
+| Replayed/duplicated gateway events | Idempotent webhook inbox keyed by event id |
+| Double-submit confirmation | Atomic status claim + cart-hash reuse |
+| Runaway recovery messaging | Stopping rules, attempt caps, merchant approval gate, DO_NOT_CONTACT fallback |
+| History rewriting | Hash-chained audit events; one-click chain verification |
+| Secret leakage | Secrets server-only; audit payload redaction; key ID is the only credential in browser payloads |
 
-## Failure scenarios
+## Known limitations
 
-1. **Budget exceeded** — three SQL packs cost ₹1,197.00 > ₹800.00 budget. Policy rejects, session becomes `REJECTED`, **no Razorpay order is created**, UI states "No payment action was taken.", audit records `POLICY_REJECTED`.
-2. **Out of stock** — Premium Interview Bundle has stock 0. Rejected pre-payment with `OUT_OF_STOCK`; UI says "This item is currently unavailable. No payment action was taken."
-3. **Duplicate confirmation** — confirming twice (or previewing the same cart again) reuses the existing active session/order via cart-hash match; UI shows "Existing secure checkout reused; no duplicate order was created."
-4. **Forged callback** — any tampered `razorpay_signature` fails HMAC verification → `PAYMENT_FAILED`, stock untouched, `PAYMENT_SIGNATURE_REJECTED` recorded.
+- Single merchant, single buyer, no auth ("Merchant Demo Admin" is hardcoded) — MVP scope.
+- In-memory rate limiter; SQLite local store; recovery actions are simulated (no email/SMS/WhatsApp).
+- Abandoned `ORDER_CREATED` sessions need an expiry sweeper beyond the resume-time check.
+- Bundle-discount authority toggle exists but discount application itself is future work.
+- Production roadmap: PostgreSQL + backups, Redis rate limiting, stock reservation with expiry, structured logs/trace IDs, RBAC auth, secret manager, real messaging channels behind compliance review.
 
-## Audit trail design
-
-- Every meaningful transition emits an `AuditEvent`: timestamp, actor (`BUYER | AGENT | POLICY_ENGINE | SYSTEM | RAZORPAY`), event type (17 types from `INTENT_RECEIVED` to `PAYMENT_MARKED_FAILED`), human-readable summary, structured JSON payload.
-- Chain: `eventHash = SHA-256(previousHash ?? "" | canonicalJson(sessionId, eventType, actor, payload))`. Canonicalization sorts keys recursively so serialization is deterministic. Timestamps are excluded from hashed material to avoid datetime-precision instability; content tampering and deletion still break every subsequent link.
-- `/audit/[sessionId]` renders the timeline, expandable payloads, copyable hashes, and an **Audit integrity** card backed by `verifyHashChain` (also exposed at `GET /api/audit/[sessionId]`).
-- Payloads are sanitized against secret-looking keys as defense-in-depth; secrets never enter audit records.
-
-## Application-level duplicate protection
-
-The Razorpay Orders API does not support an idempotency header, so AgentPay enforces idempotency itself:
-
-1. Cart items are normalized (sorted by SKU, SKU+quantity only) with policy version and buyer budget folded in.
-2. The canonical object is serialized deterministically and SHA-256 hashed → `cartHash`.
-3. Before creating an order, the service looks for an existing non-terminal session with the same `cartHash`; if one holds a Razorpay order, that order/session is returned instead of creating another.
-4. Each new session gets a unique `idempotencyKey`; the confirm button disables while submitting; confirmation-time policy re-checks run inside DB transactions.
-
-## Project structure
-
-```
-src/
-  app/                    # pages + API route handlers
-    api/{agent,catalog,checkout,payments,audit}/...
-    buy/  merchant/catalog/  audit/[sessionId]/  architecture/
-  components/
-    agent/    # chat, intent card, preview, checklist, confirmation, payment status
-    audit/    # timeline + integrity card
-    catalog/  shared/  ui/
-  lib/
-    agent/      # intent-parser (LLM adapter), fallback-parser
-    audit/      # hash-chain, audit-service
-    checkout/   # cart-hash, policy-engine, checkout-service
-    razorpay/   # REST client, order service, verify-signature
-    env.ts money.ts db.ts rate-limit.ts hash-utils.ts
-  schemas/      # Zod: agent.ts checkout.ts payment.ts
-prisma/         # schema.prisma, seed.ts, migrations/
-scripts/        # verify-security-logic.ts (chain + HMAC self-tests)
-```
-
-## Known limitations & next steps
-
-- Single merchant, single buyer, no auth — by design for the MVP scope.
-- In-memory rate limiter and audit-chain writes are per-instance; production would use Redis and transactional outbox patterns.
-- Stock decrements only on verified payment; abandoned `ORDER_CREATED` sessions need an expiry sweeper (`EXPIRED` status exists but nothing transitions to it yet).
-- LLM intent parsing supports one OpenAI-compatible provider; multi-provider routing, prompt-injection hardening, and model-version metadata in audit events are next steps.
-- Production roadmap: PostgreSQL with managed backups, Redis-backed distributed rate limiting, atomic stock *reservation* with expiry, structured logs with trace IDs, merchant/buyer auth with RBAC, secret manager integration.
-
-## Screenshots
-
-<!-- _Placeholder: add screenshots of /buy approval flow, rejection states, and /audit/[sessionId] timeline._ -->
-
-## Disclaimer
+## Disclaimers
 
 **This project uses Razorpay Test Mode. No real money is processed.**
+**All historical/analytics data shipped in seeds is explicitly synthetic demo data.**
+No PCI-compliance, production-readiness, or real-money claims are made.

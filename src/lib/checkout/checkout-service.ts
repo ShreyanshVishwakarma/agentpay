@@ -68,6 +68,19 @@ export async function createCheckoutPreview(params: {
   });
 
   if (!policyResult.ok) {
+    // Best-effort attempted value, computed server-side from catalog prices,
+    // powers the "revenue protected" metric.
+    const skus = intent.items.map((item) => item.sku);
+    const catalogItems = await db.catalogItem.findMany({
+      where: { sku: { in: skus } },
+      select: { sku: true, pricePaise: true },
+    });
+    const priceBySku = new Map(catalogItems.map((item) => [item.sku, item.pricePaise]));
+    const attemptedTotalPaise = intent.items.reduce(
+      (sum, item) => sum + (priceBySku.get(item.sku) ?? 0) * item.quantity,
+      0,
+    );
+
     const session = await db.checkoutSession.create({
       data: {
         cartHash,
@@ -79,6 +92,7 @@ export async function createCheckoutPreview(params: {
           message: policyResult.message,
           suggestedAction: policyResult.suggestedAction,
           details: policyResult.details,
+          attemptedTotalPaise,
         } as never,
         idempotencyKey: crypto.randomUUID(),
       },
@@ -647,6 +661,12 @@ export async function fulfillVerifiedPayment(params: {
         },
       });
     });
+
+    // Close the loop on any linked recovery case (original or replacement
+    // session). Dynamic import avoids a module cycle with recovery-service.
+    const { markRecoveredIfLinked } = await import("@/lib/recovery/recovery-service");
+    await markRecoveredIfLinked(session.id, session.totalPaise);
+
     return { ok: true };
   } catch (error) {
     return {
