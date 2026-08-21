@@ -155,7 +155,7 @@ export function PolicyStudio({ policy }: { policy: PolicyValues }) {
                 Hard limits enforced on every preview and confirmation.
               </CardDescription>
             </div>
-            <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
               Current: v{policy.policyVersion}
             </Badge>
           </div>

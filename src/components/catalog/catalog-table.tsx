@@ -51,7 +51,7 @@ export function CatalogTable({ items }: { items: CatalogRow[] }) {
               </TableCell>
               <TableCell className="text-center">
                 {!item.active ? (
-                  <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-500">
+                  <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
                     Inactive
                   </Badge>
                 ) : item.stock > 0 ? (

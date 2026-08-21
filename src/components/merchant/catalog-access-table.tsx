@@ -136,7 +136,7 @@ export function CatalogAccessTable({ items }: { items: CatalogAccessRow[] }) {
                       Paused
                     </Badge>
                   ) : !item.agentPurchasable ? (
-                    <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-500">
+                    <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
                       Human-only
                     </Badge>
                   ) : item.stock > 0 ? (

@@ -91,7 +91,7 @@ export function CheckoutPreview({
             {addOns.map((addOn) => (
               <div
                 key={addOn.sku}
-                className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50/50 px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-accent/50 px-3 py-2"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">

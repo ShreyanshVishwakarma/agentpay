@@ -29,7 +29,7 @@ export function MetricCard({
     green: "text-emerald-700",
     red: "text-red-700",
     amber: "text-amber-700",
-    indigo: "text-indigo-700",
+    indigo: "text-primary",
   }[tone];
 
   return (
@@ -118,7 +118,7 @@ export function OpportunitiesTable({
               <td className="px-3 py-2.5">
                 <Link
                   href={`/audit/${row.sessionId}`}
-                  className="font-mono text-[11px] text-indigo-700 hover:underline"
+                  className="font-mono text-[11px] text-primary hover:underline"
                 >
                   {row.sessionId.slice(-10)}
                 </Link>
@@ -132,7 +132,7 @@ export function OpportunitiesTable({
               </td>
               <td className="px-3 py-2.5 text-xs">{row.opportunityType}</td>
               <td className="max-w-[220px] px-3 py-2.5 text-xs leading-relaxed">
-                <span className="font-mono text-[10px] font-medium text-indigo-700">
+                <span className="font-mono text-[10px] font-medium text-primary">
                   {row.interventionType}
                 </span>
                 <p className="mt-0.5 text-muted-foreground">{row.recommendedIntervention}</p>
@@ -151,7 +151,7 @@ export function OpportunitiesTable({
                   row.hasCase ? (
                     <Link
                       href={`/merchant/recovery`}
-                      className="inline-flex items-center gap-1 text-xs text-indigo-700 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
                       case <ArrowRight className="size-3" />
                     </Link>
@@ -161,7 +161,7 @@ export function OpportunitiesTable({
                 ) : (
                   <Link
                     href={`/audit/${row.sessionId}`}
-                    className="text-xs text-indigo-700 hover:underline"
+                    className="text-xs text-primary hover:underline"
                   >
                     view
                   </Link>
@@ -177,10 +177,10 @@ export function OpportunitiesTable({
 
 export function WhyThisMattersPanel() {
   return (
-    <Card className="border-indigo-200 bg-indigo-50/60 shadow-sm">
+    <Card className="border-primary/25 bg-accent/50 shadow-sm">
       <CardContent className="flex items-start gap-2.5 pt-6">
-        <HeartPulse className="mt-0.5 size-4 shrink-0 text-indigo-600" />
-        <div className="text-sm leading-relaxed text-indigo-900">
+        <HeartPulse className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div className="text-sm leading-relaxed text-accent-foreground">
           <p className="font-medium">Why this matters</p>
           <p className="mt-1 text-xs">
             AgentPay does not optimize for more payment attempts. It helps

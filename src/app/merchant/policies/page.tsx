@@ -124,31 +124,31 @@ export default async function MerchantPoliciesPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200 bg-slate-50 shadow-sm">
+          <Card className="bg-muted/50 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm">
-                <ScrollText className="size-4 text-slate-600" />
+                <ScrollText className="size-4 text-muted-foreground" />
                 How enforcement works
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-xs leading-relaxed text-muted-foreground">
               <p className="flex items-start gap-1.5">
-                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-indigo-600" />
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 Checkout preview and confirmation always evaluate the{" "}
                 <span className="font-medium text-foreground">latest</span>{" "}
                 policy version against live inventory and database prices.
               </p>
               <p className="flex items-start gap-1.5">
-                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-indigo-600" />
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 Rejections carry a machine-readable code plus the exact control
                 responsible (e.g.{" "}
-                <code className="rounded bg-white/70 px-1 font-mono text-[10px]">
+                <code className="rounded bg-card px-1 font-mono text-[10px]">
                   catalog_access.paused
                 </code>
                 ).
               </p>
               <p className="flex items-start gap-1.5">
-                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-indigo-600" />
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 The LLM can read these limits through the catalog endpoint but
                 can never change them or argue with them.
               </p>

@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "border-slate-200 bg-slate-50 text-slate-600",
+  DRAFT: "border-border bg-muted text-muted-foreground",
   AWAITING_CONFIRMATION: "border-amber-200 bg-amber-50 text-amber-700",
   REJECTED: "border-red-200 bg-red-50 text-red-700",
-  ORDER_CREATED: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  ORDER_CREATED: "border-primary/30 bg-primary/10 text-primary",
   PAYMENT_PENDING: "border-amber-200 bg-amber-50 text-amber-700",
   PAYMENT_VERIFIED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   PAYMENT_FAILED: "border-red-200 bg-red-50 text-red-700",
-  EXPIRED: "border-slate-200 bg-slate-50 text-slate-500",
+  EXPIRED: "border-border bg-muted text-muted-foreground",
 };
 
 export function StatusBadge({

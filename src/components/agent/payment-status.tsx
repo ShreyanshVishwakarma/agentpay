@@ -70,10 +70,10 @@ export function PaymentStatus({
 
   if (stage === "order_created" && confirmResult) {
     return (
-      <Card className="border-indigo-200 bg-indigo-50/50 shadow-sm">
+      <Card className="border-primary/25 bg-accent/50 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm text-indigo-800">
-            <CreditCard className="size-4" />
+          <CardTitle className="flex items-center gap-2 text-sm text-accent-foreground">
+            <CreditCard className="size-4 text-primary" />
             Test checkout ready
           </CardTitle>
           <CardDescription>

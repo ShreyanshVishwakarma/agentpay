@@ -75,7 +75,7 @@ export default async function MerchantOverviewPage() {
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {CONSOLE_LINKS.map((link) => (
           <Link key={link.href} href={link.href}>
-            <Card className="transition-colors hover:border-indigo-300 hover:bg-accent/40">
+            <Card className="transition-colors hover:border-ring hover:bg-accent/40">
               <CardContent className="flex items-center gap-2.5 pt-5">
                 <link.icon className="size-4 text-primary" />
                 <span className="text-sm font-medium">{link.label}</span>
@@ -108,7 +108,7 @@ export default async function MerchantOverviewPage() {
               <span>Recent checkout sessions</span>
               <Link
                 href="/merchant/audit"
-                className="inline-flex items-center gap-1 text-xs font-normal text-indigo-700 hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-normal text-primary hover:underline"
               >
                 <ScrollText className="size-3.5" />
                 Full audit trail

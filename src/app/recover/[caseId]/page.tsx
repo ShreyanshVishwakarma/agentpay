@@ -114,7 +114,7 @@ export default async function BuyerRecoveryPage({
             policy checks, requires your explicit confirmation, creates a
             Razorpay test-mode order, and is verified server-side before
             fulfilment.{" "}
-            <Link href="/buy" className="font-medium text-indigo-700 hover:underline">
+              <Link href="/buy" className="font-medium text-primary hover:underline">
               Start a new request instead
             </Link>
             .

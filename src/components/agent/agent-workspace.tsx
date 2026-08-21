@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
   ArrowRight,
   Bot,
   History,
   Info,
   ScrollText,
-  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +20,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AgentChat } from "@/components/agent/agent-chat";
+import { ChatTranscript } from "@/components/agent/chat-transcript";
+import type { TranscriptEntry } from "@/components/agent/chat-transcript";
 import { IntentCard } from "@/components/agent/intent-card";
 import { CheckoutPreview } from "@/components/agent/checkout-preview";
 import {
@@ -75,6 +75,10 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+function newEntryId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function AgentWorkspace({
   resumeSessionId = null,
 }: {
@@ -82,9 +86,8 @@ export function AgentWorkspace({
 }) {
   const [phase, setPhase] = useState<Phase>(resumeSessionId ? "previewing" : "idle");
   const [agentMode, setAgentMode] = useState(true);
-  const [trace, setTrace] = useState<
-    Array<{ tool: string; args: Record<string, unknown>; resultSummary: string }>
-  >([]);
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [statusText, setStatusText] = useState<string | null>(null);
   const [addOnBusySku, setAddOnBusySku] = useState<string | null>(null);
   const [mode, setMode] = useState<"llm" | "fallback" | null>(null);
   const [intent, setIntent] = useState<PurchaseIntent | null>(null);
@@ -102,6 +105,13 @@ export function AgentWorkspace({
   const [auditEvents, setAuditEvents] = useState<AuditEventDto[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const confirmingRef = useRef(false);
+
+  const pushErrorNote = useCallback((text: string) => {
+    setTranscript((prev) => [
+      ...prev,
+      { id: newEntryId(), kind: "note", tone: "error", text },
+    ]);
+  }, []);
 
   const refreshAudit = useCallback(async (id: string) => {
     try {
@@ -136,6 +146,15 @@ export function AgentWorkspace({
         setSessionId(data.sessionId);
         setPreview({ ...data, status: "AWAITING_CONFIRMATION" });
         setPhase("ready");
+        setTranscript((prev) => [
+          ...prev,
+          {
+            id: newEntryId(),
+            kind: "note",
+            tone: "info",
+            text: "Resumed your saved checkout — review the cart and confirm below.",
+          },
+        ]);
         void refreshAudit(data.sessionId);
       } catch {
         if (!cancelled) {
@@ -163,7 +182,10 @@ export function AgentWorkspace({
       setSessionId(null);
       setAuditEvents([]);
       setMode(null);
-      setTrace([]);
+      setTranscript([{ id: newEntryId(), kind: "user", text: message }]);
+      setStatusText(
+        agentMode ? "Reading the catalog and building your cart…" : "Parsing your request…",
+      );
 
       if (agentMode) {
         // Autonomous buying-agent loop: the LLM drives merchant API tools.
@@ -181,21 +203,34 @@ export function AgentWorkspace({
           >("/api/agent/v1/chat", { message });
 
           if ("error" in response) {
+            setStatusText(null);
             setParseError(response.error.message);
+            pushErrorNote(response.error.message);
             setPhase("idle");
             return;
           }
 
-          setTrace(response.trace);
           setMode(response.mode);
+          setTranscript((prev) => [
+            ...prev,
+            ...response.trace.map((step, index) => ({
+              id: newEntryId(),
+              kind: "tool" as const,
+              index: index + 1,
+              tool: step.tool,
+              summary: step.resultSummary,
+            })),
+          ]);
 
           if (response.outcome.type === "proposal") {
+            setStatusText(null);
             setSessionId(response.outcome.sessionId);
             setPreview(response.outcome.preview);
             setNotice("The agent built this cart autonomously. You decide whether to pay.");
             setPhase("ready");
             void refreshAudit(response.outcome.sessionId);
           } else if (response.outcome.type === "rejection") {
+            setStatusText(null);
             setRejection({
               message: response.outcome.message,
               suggestedAction: "Adjust the request within merchant policy.",
@@ -203,11 +238,14 @@ export function AgentWorkspace({
             setPhase("failed");
             setSessionId(null);
           } else {
+            setStatusText(null);
             setParseError(response.outcome.question);
             setPhase("idle");
           }
         } catch {
+          setStatusText(null);
           setParseError("The buying agent could not complete your request.");
+          pushErrorNote("The buying agent could not complete your request.");
           setPhase("idle");
         }
         return;
@@ -220,14 +258,18 @@ export function AgentWorkspace({
           InterpretOk | { error: { message: string } }
         >("/api/agent/interpret", { message });
         if ("error" in parsed) {
+          setStatusText(null);
           setParseError(parsed.error.message);
+          pushErrorNote(parsed.error.message);
           setPhase("idle");
           return;
         }
         intent = parsed.intent;
         mode = parsed.mode;
       } catch {
+        setStatusText(null);
         setParseError("Could not reach the agent service. Please try again.");
+        pushErrorNote("Could not reach the agent service. Please try again.");
         setPhase("idle");
         return;
       }
@@ -236,13 +278,17 @@ export function AgentWorkspace({
       setMode(mode);
 
       setPhase("previewing");
+      setStatusText("Checking merchant policy…");
       try {
         const outcome = await postJson<
           PreviewApproved | PreviewRejected | { error: { message: string } }
         >("/api/checkout/preview", { intent, sourceMessage: message });
 
+        setStatusText(null);
+
         if ("error" in outcome) {
           setParseError(outcome.error.message);
+          pushErrorNote(outcome.error.message);
           setPhase("idle");
           return;
         }
@@ -263,11 +309,13 @@ export function AgentWorkspace({
           setPhase("ready");
         }
       } catch {
+        setStatusText(null);
         setParseError("Could not prepare your checkout. Please try again.");
+        pushErrorNote("Could not prepare your checkout. Please try again.");
         setPhase("idle");
       }
     },
-    [agentMode, refreshAudit],
+    [agentMode, pushErrorNote, refreshAudit],
   );
 
   const verifyPaymentCallback = useCallback(
@@ -291,19 +339,30 @@ export function AgentWorkspace({
         if (verification.verified) {
           setPaymentStage("verified");
           setPhase("verified");
+          setTranscript((prev) => [
+            ...prev,
+            {
+              id: newEntryId(),
+              kind: "note",
+              tone: "success",
+              text: "Payment verified server-side — stock fulfilled and recorded in the audit chain.",
+            },
+          ]);
         } else {
           setPaymentStage("failed");
           setFailureMessage(verification.message ?? null);
           setPhase("failed");
+          pushErrorNote(verification.message ?? "Verification failed. No fulfillment occurred.");
         }
       } catch {
         setPaymentStage("failed");
         setFailureMessage("Verification request failed. No fulfillment occurred.");
         setPhase("failed");
+        pushErrorNote("Verification request failed. No fulfillment occurred.");
       }
       void refreshAudit(result.sessionId);
     },
-    [refreshAudit],
+    [pushErrorNote, refreshAudit],
   );
 
   const openRazorpayCheckout = useCallback(
@@ -325,7 +384,7 @@ export function AgentWorkspace({
         currency: result.razorpay.currency,
         name: result.razorpay.merchantName,
         description: "AgentPay test-mode checkout",
-        theme: { color: "#4f46e5" },
+        theme: { color: "#2f6b4f" },
         handler: (callback) => {
           setPaymentStage("submitted");
           void verifyPaymentCallback(result, callback);
@@ -390,6 +449,7 @@ export function AgentWorkspace({
     confirmingRef.current = true;
     setPhase("confirming");
     setNotice(null);
+    setStatusText("Creating secure test checkout…");
 
     try {
       const outcome = await postJson<ConfirmResponse>("/api/checkout/confirm", {
@@ -397,6 +457,7 @@ export function AgentWorkspace({
       });
 
       if ("error" in outcome) {
+        setStatusText(null);
         if (outcome.error.code === "RAZORPAY_ORDER_CREATION_FAILED") {
           setPaymentStage("demo_unavailable");
           setPhase("failed");
@@ -409,6 +470,7 @@ export function AgentWorkspace({
       }
 
       if (outcome.status === "REJECTED") {
+        setStatusText(null);
         setRejection(outcome);
         setPreview(null);
         setPhase("failed");
@@ -429,12 +491,14 @@ export function AgentWorkspace({
       setPhase("order_created");
       await openRazorpayCheckout(outcome);
     } catch {
+      setStatusText(null);
       setRejection({
         message: "Confirmation failed due to a network error. Please retry.",
       });
       setPhase("failed");
     } finally {
       confirmingRef.current = false;
+      setStatusText(null);
     }
   }, [preview, openRazorpayCheckout, refreshAudit]);
 
@@ -445,97 +509,65 @@ export function AgentWorkspace({
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        {/* Left: buyer prompt panel */}
-        <div className="space-y-4">
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-sm">What would you like to buy?</CardTitle>
-                  <CardDescription>
-                    Type a natural-language request. AgentPay converts it into a
-                    bounded purchase you control.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2 pt-0.5">
-                  <Switch
-                    id="agent-mode"
-                    checked={agentMode}
-                    onCheckedChange={setAgentMode}
-                  />
-                  <Label htmlFor="agent-mode" className="flex items-center gap-1 text-xs font-medium">
-                    <Bot className="size-3.5 text-primary" />
-                    Agent mode
-                  </Label>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <AgentChat onSubmit={handleSubmit} busy={busy} mode={mode} />
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                {agentMode
-                  ? "Agent mode: an LLM drives merchant API tools — search_catalog, get_product, propose_checkout — to build this cart itself. It still cannot pay."
-                  : "Assistant mode: the LLM only extracts structured intent from your sentence."}
+        {/* Left: conversation panel */}
+        <div className="flex h-[540px] flex-col overflow-hidden rounded-2xl bg-card shadow-card-tinted ring-1 ring-foreground/[0.06]">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
+            <div>
+              <p className="font-display text-sm font-semibold tracking-tight">
+                Agent checkout
               </p>
-            </CardContent>
-          </Card>
-
-          {trace.length > 0 && (
-            <Card className="border-border/80 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Wrench className="size-4 text-primary" />
-                  Agent tool trace
-                </CardTitle>
-                <CardDescription>
-                  Every call the agent made — deterministic tools, server-side data.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                {trace.map((step, index) => (
-                  <div
-                    key={`${step.tool}-${index}`}
-                    className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5"
+              <p className="text-[11px] text-muted-foreground">
+                Test mode · nothing is charged without you
+                {mode && (
+                  <span
+                    className={
+                      mode === "fallback"
+                        ? "ml-1.5 font-medium text-amber-700 dark:text-amber-400"
+                        : "ml-1.5 font-medium text-primary"
+                    }
                   >
-                    <p className="font-mono text-[11px] font-medium text-indigo-700">
-                      {index + 1}. {step.tool}()
-                    </p>
-                    <p className="truncate text-[11px] text-muted-foreground" title={step.resultSummary}>
-                      → {step.resultSummary}
-                    </p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                    · {mode === "fallback" ? "AI fallback" : "LLM parsing"}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="agent-mode"
+                checked={agentMode}
+                onCheckedChange={setAgentMode}
+              />
+              <Label
+                htmlFor="agent-mode"
+                className="flex items-center gap-1 text-xs font-medium"
+              >
+                <Bot className="size-3.5 text-primary" />
+                Agent mode
+              </Label>
+            </div>
+          </div>
 
-          {intent && <IntentCard intent={intent} mode={mode} />}
+          <div className="min-h-0 flex-1">
+            <ChatTranscript
+              entries={transcript}
+              status={statusText}
+              onPickPrompt={(prompt) => void handleSubmit(prompt)}
+            />
+          </div>
 
-          {parseError && (
-            <Card className="border-red-200 bg-red-50/50 shadow-sm">
-              <CardContent className="flex items-start gap-2 pt-6 text-sm text-red-800">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <div>
-                  <p>{parseError}</p>
-                  <p className="mt-1 text-xs text-red-700">
-                    Please restate your request — nothing was charged or ordered.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <AgentChat onSubmit={handleSubmit} busy={busy} />
         </div>
 
         {/* Right: policy decision + checkout */}
         <div className="space-y-4">
           {!showWorkspaceColumn && (
-            <Card className="border-dashed border-border shadow-none">
+            <Card className="border-dashed shadow-none ring-border">
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
                 <ScrollText className="size-8 text-muted-foreground/50" />
                 <p className="text-sm font-medium text-foreground">
                   Your checkout decision will appear here
                 </p>
-                <p className="max-w-xs text-xs text-muted-foreground">
+                <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
                   Server-calculated totals, transparent policy checks, and an
                   explicit confirmation gate before any payment.
                 </p>
@@ -543,14 +575,18 @@ export function AgentWorkspace({
             </Card>
           )}
 
-          {rejection && <PolicyRejectionList
-            message={rejection.message}
-            suggestedAction={
-              "suggestedAction" in rejection && rejection.suggestedAction
-                ? rejection.suggestedAction
-                : "Try one of the suggested prompts."
-            }
-          />}
+          {intent && <IntentCard intent={intent} mode={mode} />}
+
+          {rejection && (
+            <PolicyRejectionList
+              message={rejection.message}
+              suggestedAction={
+                "suggestedAction" in rejection && rejection.suggestedAction
+                  ? rejection.suggestedAction
+                  : "Try one of the suggested prompts."
+              }
+            />
+          )}
 
           {preview && (
             <>
@@ -566,8 +602,8 @@ export function AgentWorkspace({
           )}
 
           {notice && (
-            <p className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
-              <Info className="size-3.5 shrink-0" />
+            <p className="flex items-center gap-2 rounded-lg border border-primary/25 bg-accent/60 px-3 py-2 text-xs text-accent-foreground">
+              <Info className="size-3.5 shrink-0 text-primary" />
               {notice}
             </p>
           )}
@@ -585,7 +621,7 @@ export function AgentWorkspace({
 
       {/* Recent audit events for the current session */}
       {sessionId && auditEvents.length > 0 && (
-        <Card className="border-border/80 shadow-sm">
+        <Card className="shadow-card-tinted">
           <CardHeader className="pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>

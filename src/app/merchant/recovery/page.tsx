@@ -15,13 +15,13 @@ export const dynamic = "force-dynamic";
 
 const STATUS_TONE: Record<string, string> = {
   ELIGIBLE: "border-amber-200 bg-amber-50 text-amber-700",
-  PROPOSED: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  MERCHANT_APPROVED: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  ACTION_EXECUTED: "border-sky-200 bg-sky-50 text-sky-700",
-  BUYER_REENGAGED: "border-sky-200 bg-sky-50 text-sky-700",
+  PROPOSED: "border-primary/25 bg-accent text-accent-foreground",
+  MERCHANT_APPROVED: "border-primary/25 bg-accent text-accent-foreground",
+  ACTION_EXECUTED: "border-primary/35 bg-primary/10 text-primary",
+  BUYER_REENGAGED: "border-primary/35 bg-primary/10 text-primary",
   RECOVERED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   STOPPED: "border-red-200 bg-red-50 text-red-700",
-  EXPIRED: "border-slate-200 bg-slate-50 text-slate-500",
+  EXPIRED: "border-border bg-muted text-muted-foreground",
 };
 
 export default async function MerchantRecoveryPage() {
@@ -59,7 +59,7 @@ export default async function MerchantRecoveryPage() {
         <div className="space-y-3">
           {queue.map((recoveryCase) => (
             <Link key={recoveryCase.id} href={`/merchant/recovery/${recoveryCase.id}`}>
-              <Card className="transition-colors hover:border-indigo-300 hover:bg-accent/30">
+              <Card className="transition-colors hover:border-ring hover:bg-accent/30">
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">

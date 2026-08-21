@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Architecture — AgentPay",
@@ -28,8 +29,7 @@ const LAYERS = [
   {
     icon: Bot,
     title: "Untrusted LLM layer",
-    tone: "border-violet-200 bg-violet-50/60",
-    iconTone: "text-violet-600",
+    untrusted: true,
     points: [
       "Converts natural language into a Zod-validated PurchaseIntent — nothing more.",
       "Cannot set prices, check inventory, create orders, or claim success.",
@@ -39,8 +39,7 @@ const LAYERS = [
   {
     icon: ShieldCheck,
     title: "Deterministic policy engine",
-    tone: "border-indigo-200 bg-indigo-50/60",
-    iconTone: "text-indigo-600",
+    untrusted: false,
     points: [
       "Pure server-side rules: SKU exists, item active, stock available, quantity caps, budget and merchant limits.",
       "Every rupee is recomputed from database prices in integer paise.",
@@ -50,8 +49,7 @@ const LAYERS = [
   {
     icon: UserCheck,
     title: "Confirmation gate",
-    tone: "border-amber-200 bg-amber-50/60",
-    iconTone: "text-amber-600",
+    untrusted: false,
     points: [
       "No Razorpay order exists until the buyer explicitly confirms.",
       "Policies are re-checked against live inventory at confirm time.",
@@ -61,8 +59,7 @@ const LAYERS = [
   {
     icon: CircleDollarSign,
     title: "Razorpay boundary",
-    tone: "border-sky-200 bg-sky-50/60",
-    iconTone: "text-sky-600",
+    untrusted: false,
     points: [
       "Test-mode Orders API called server-side with amounts from persisted session totals.",
       "Only the key ID reaches the browser; the secret never leaves the server.",
@@ -72,8 +69,7 @@ const LAYERS = [
   {
     icon: KeyRound,
     title: "Signature verification",
-    tone: "border-emerald-200 bg-emerald-50/60",
-    iconTone: "text-emerald-600",
+    untrusted: false,
     points: [
       "HMAC-SHA256 of order_id|payment_id recomputed on the server.",
       "Timing-safe comparison; popup “success” alone proves nothing.",
@@ -83,8 +79,7 @@ const LAYERS = [
   {
     icon: ScrollText,
     title: "Tamper-evident audit chain",
-    tone: "border-slate-200 bg-slate-50",
-    iconTone: "text-slate-600",
+    untrusted: false,
     points: [
       "Every decision, rejection and transition becomes an event.",
       "eventHash = SHA-256(previousHash | canonical event) — editing history breaks the chain.",
@@ -132,19 +127,43 @@ export default function ArchitecturePage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {LAYERS.map((layer) => (
-          <Card key={layer.title} className={`${layer.tone} shadow-sm`}>
+        {LAYERS.map((layer, index) => (
+          <Card
+            key={layer.title}
+            className={cn(
+              "shadow-card-tinted transition-shadow duration-300 hover:shadow-lifted-tinted",
+              layer.untrusted && "border-dashed",
+            )}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm">
-                <layer.icon className={`size-4 ${layer.iconTone}`} />
-                {layer.title}
+                <span className="flex items-center gap-2">
+                  <layer.icon className="size-4 text-primary" />
+                  {layer.title}
+                </span>
+                {layer.untrusted && (
+                  <span className="ml-auto rounded-md border border-dashed border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    zero trust
+                  </span>
+                )}
+                {!layer.untrusted && (
+                  <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground/60">
+                    L{index + 1}
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="space-y-1.5">
                 {layer.points.map((point) => (
-                  <li key={point} className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-                    <span className={`mt-1.5 size-1 shrink-0 rounded-full ${layer.iconTone.replace("text-", "bg-")}`} />
+                  <li
+                    key={point}
+                    className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 size-1 shrink-0 rounded-full bg-primary"
+                    />
                     {point}
                   </li>
                 ))}

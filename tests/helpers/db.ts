@@ -32,6 +32,11 @@ export async function seedTestData(): Promise<void> {
         active: item.active,
         name: `Test ${item.sku}`,
         description: "Integration test item",
+        // Reset AI-access controls so suite order can never leak state.
+        paused: false,
+        agentPurchasable: true,
+        agentDiscoverable: true,
+        maxAgentQuantity: null,
       },
       create: {
         sku: item.sku,

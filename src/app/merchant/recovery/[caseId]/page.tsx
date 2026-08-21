@@ -130,7 +130,7 @@ export default async function RecoveryCasePage({
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Recommended intervention</p>
-              <p className="font-mono text-[11px] font-medium text-indigo-700">
+              <p className="font-mono text-[11px] font-medium text-primary">
                 {recoveryCase.interventionType}
               </p>
             </div>
@@ -167,7 +167,7 @@ export default async function RecoveryCasePage({
         </Card>
       </div>
 
-      <Card className="mt-4 border-indigo-200 bg-indigo-50/50 shadow-sm">
+      <Card className="mt-4 border-primary/25 bg-accent/50 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Merchant action</CardTitle>
           <CardDescription>
@@ -197,7 +197,7 @@ export default async function RecoveryCasePage({
               Buyer-facing page:{" "}
               <Link
                 href={`/recover/${recoveryCase.id}`}
-                className="font-medium text-indigo-700 hover:underline"
+                className="font-medium text-primary hover:underline"
               >
                 /recover/{recoveryCase.id.slice(-8)}
               </Link>

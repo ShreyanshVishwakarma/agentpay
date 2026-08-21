@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 
 const BUYER_NAV = [{ href: "/buy", label: "Agent Checkout" }];
 
@@ -24,14 +23,21 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+        "relative rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-200 active:translate-y-px",
         active
           ? "bg-accent font-medium text-accent-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {label}
+      {active && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-2.5 -bottom-[9px] h-0.5 rounded-full bg-primary"
+        />
+      )}
     </Link>
   );
 }
@@ -40,30 +46,31 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <Link
+          href="/"
+          className="group flex shrink-0 items-center gap-2 rounded-md transition-colors"
+        >
+          <span className="flex size-7 items-center justify-center rounded-[8px] bg-primary text-primary-foreground shadow-card-tinted transition-transform duration-300 group-hover:-rotate-6">
             <ShieldCheck className="size-4" />
           </span>
-          <span className="hidden text-sm font-semibold tracking-tight text-foreground sm:inline">
+          <span className="hidden font-display text-sm font-semibold tracking-tight text-foreground sm:inline">
             AgentPay
           </span>
-          <Badge
-            variant="outline"
-            className="hidden border-amber-300 bg-amber-50 text-[10px] font-medium uppercase tracking-wide text-amber-700 md:inline-flex"
-          >
-            Test Mode
-          </Badge>
+          <span className="hidden items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-700 md:inline-flex dark:text-amber-400">
+            <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+            Test mode
+          </span>
         </Link>
 
         <nav className="flex items-center gap-0.5 overflow-x-auto">
-          <span className="mr-1 hidden text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70 lg:inline">
+          <span className="mr-1 hidden text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60 lg:inline">
             Buyer
           </span>
           {BUYER_NAV.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
           <span className="mx-1 hidden h-4 w-px bg-border lg:inline-block" />
-          <span className="mr-1 hidden text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70 lg:inline">
+          <span className="mr-1 hidden text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60 lg:inline">
             Merchant
           </span>
           {MERCHANT_NAV.map((item) => (

@@ -39,14 +39,14 @@ export default async function MerchantCatalogPage() {
         </Button>
       </div>
 
-      <Card className="mb-6 border-indigo-200 bg-indigo-50/60">
-        <CardContent className="flex items-start gap-2.5 pt-6 text-sm text-indigo-900">
-          <Info className="mt-0.5 size-4 shrink-0" />
+      <Card className="mb-6 border-primary/25 bg-accent/50">
+        <CardContent className="flex items-start gap-2.5 pt-6 text-sm text-accent-foreground">
+          <Info className="mt-0.5 size-4 shrink-0 text-primary" />
           <div>
             <p className="font-medium">Agent-readable endpoint</p>
             <p className="mt-0.5 text-xs leading-relaxed">
               Agents discover this catalog at{" "}
-              <code className="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px]">
+              <code className="rounded bg-card px-1 py-0.5 font-mono text-[11px]">
                 GET /api/catalog
               </code>{" "}
               — it returns SKUs, descriptions, integer paise prices, formatted

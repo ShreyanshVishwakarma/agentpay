@@ -5,10 +5,10 @@ import { Check, ChevronDown, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ACTOR_STYLES: Record<string, string> = {
-  BUYER: "bg-sky-500",
-  AGENT: "bg-violet-500",
-  POLICY_ENGINE: "bg-indigo-600",
-  SYSTEM: "bg-slate-500",
+  BUYER: "bg-foreground",
+  AGENT: "bg-primary",
+  POLICY_ENGINE: "bg-primary/50",
+  SYSTEM: "bg-muted-foreground/40",
   RAZORPAY: "bg-emerald-600",
 };
 
@@ -81,7 +81,7 @@ function HashChip({ hash }: { hash: string | null }) {
       className="inline-flex items-center gap-1 rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      {copied ? "copied!" : `${hash.slice(0, 10)}…`}
+      {copied ? "copied" : `${hash.slice(0, 10)}…`}
     </button>
   );
 }
@@ -128,7 +128,7 @@ export function AuditTimeline({
               <span
                 className={cn(
                   "mt-1.5 size-2.5 shrink-0 rounded-full ring-4 ring-background",
-                  ACTOR_STYLES[event.actor] ?? "bg-slate-400",
+                  ACTOR_STYLES[event.actor] ?? "bg-muted-foreground/30",
                 )}
                 title={event.actor}
               />
@@ -178,7 +178,7 @@ export function AuditTimeline({
               </div>
 
               {isExpanded && (
-                <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
+                <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-foreground p-3 font-mono text-[11px] leading-relaxed text-background">
                   {JSON.stringify(event.payload, null, 2)}
                 </pre>
               )}

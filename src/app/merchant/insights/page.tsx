@@ -52,7 +52,7 @@ export default async function MerchantInsightsPage() {
               <ArrowRight className="size-3.5" />
             </Link>
           </Button>
-          <Badge variant="outline" className="gap-1 border-slate-200 bg-slate-50 text-[10px] uppercase text-slate-500">
+          <Badge variant="outline" className="gap-1 border-border bg-muted text-[10px] uppercase text-muted-foreground">
             <RefreshCw className="size-3" />
             Synthetic demo data
           </Badge>

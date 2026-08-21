@@ -56,10 +56,10 @@ export function PolicySimulator({ scenarios }: { scenarios: Scenario[] }) {
   }
 
   return (
-    <Card className="border-indigo-200 bg-indigo-50/40 shadow-sm">
+    <Card className="border-primary/25 bg-accent/40 shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <FlaskConical className="size-4 text-indigo-600" />
+          <FlaskConical className="size-4 text-primary" />
           Policy simulator
         </CardTitle>
         <CardDescription>
@@ -76,7 +76,7 @@ export function PolicySimulator({ scenarios }: { scenarios: Scenario[] }) {
               onClick={() => setSelected(scenario.key)}
               className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                 selected === scenario.key
-                  ? "border-indigo-400 bg-indigo-100 font-medium text-indigo-800"
+                  ? "border-primary bg-primary/10 font-medium text-primary"
                   : "border-border bg-card text-muted-foreground hover:bg-accent"
               }`}
             >
