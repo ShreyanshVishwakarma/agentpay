@@ -14,7 +14,7 @@ export async function GET() {
   try {
     const [items, policy] = await Promise.all([
       db.catalogItem.findMany({
-        where: { active: true },
+        where: { active: true, agentDiscoverable: true, paused: false },
         orderBy: { pricePaise: "asc" },
       }),
       getPolicyConfig(),
@@ -22,7 +22,7 @@ export async function GET() {
 
     return NextResponse.json({
       merchant: policy.merchantName,
-      currency: "INR",
+      currency: policy.allowedCurrency,
       maxItemsPerOrder: policy.maxItemsPerOrder,
       items: items.map((item) => ({
         sku: item.sku,
@@ -31,7 +31,11 @@ export async function GET() {
         pricePaise: item.pricePaise,
         formattedPrice: formatPaise(item.pricePaise),
         availability: item.stock > 0 ? "in_stock" : "out_of_stock",
-        maxQuantity: Math.min(item.stock, policy.maxItemsPerOrder),
+        maxQuantity: Math.min(
+          item.stock,
+          policy.maxItemsPerOrder,
+          item.maxAgentQuantity ?? policy.maxQuantityPerItem,
+        ),
       })),
     });
   } catch (error) {

@@ -14,21 +14,111 @@ datasource db {
 }
 
 model CatalogItem {
-  id          String   @id @default(cuid())
-  sku         String   @unique
-  name        String
-  description String
-  pricePaise  Int
-  currency    String   @default("INR")
-  stock       Int
-  active      Boolean  @default(true)
-  imageUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String    @id @default(cuid())
+  sku              String    @unique
+  name             String
+  description      String
+  pricePaise       Int
+  currency         String    @default("INR")
+  stock            Int
+  active           Boolean   @default(true)
+  imageUrl         String?
+  // Agent access controls (Commerce Control Plane)
+  agentDiscoverable Boolean  @default(true)
+  agentPurchasable  Boolean  @default(true)
+  paused            Boolean  @default(false)
+  maxAgentQuantity  Int?
+  availableFrom     DateTime?
+  availableUntil    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   checkoutItems CheckoutItem[]
 
   @@index([active])
+}
+
+/// Versioned merchant AI-commerce policy. Each save creates a new immutable
+/// row; the highest policyVersion is authoritative. Historical checkouts are
+/// never re-evaluated against newer versions.
+model MerchantPolicy {
+  id                              String    @id @default(cuid())
+  policyVersion                   Int       @unique
+  merchantName                    String
+  // Transaction controls
+  maxOrderPaise                   Int
+  maxQuantityPerItem              Int       @default(5)
+  maxItemsPerOrder                Int
+  confirmationRequired            Boolean   @default(true)
+  allowedCurrency                 String    @default("INR")
+  sessionExpiryMinutes            Int       @default(30)
+  // Budget controls
+  defaultBuyerBudgetPaise         Int?
+  maxAgentProposedCartPaise       Int       @default(200000)
+  extraConfirmationThresholdPaise Int       @default(75000)
+  dailyTestModeCapPaise           Int       @default(500000)
+  // Agent authority controls
+  agentCanRecommend               Boolean   @default(true)
+  agentCanPrepareCheckout         Boolean   @default(true)
+  agentCanApplyBundleDiscount     Boolean   @default(false)
+  // Risk controls
+  maxAttemptsPerSession           Int       @default(3)
+  maxCheckoutsPerCartHash         Int       @default(5)
+  coolingOffMinutesAfterFailures  Int       @default(10)
+  lowStockReviewThreshold         Int       @default(2)
+  // Recovery controls
+  recoveryEnabled                 Boolean   @default(true)
+  maxRecoveryAttempts             Int       @default(2)
+  changedBy                       String    @default("Merchant Demo Admin")
+  changeNote                      String?
+  createdAt                       DateTime  @default(now())
+  supersededAt                    DateTime?
+
+  @@index([createdAt])
+}
+
+/// Bounded revenue-recovery case linked to exactly one checkout session.
+model RecoveryCase {
+  id                        String    @id @default(cuid())
+  checkoutSessionId         String    @unique
+  status                    String    @default("ELIGIBLE")
+  interventionType          String
+  reasonCodes               Json
+  expectedRecoveryValuePaise Int
+  actualRecoveredValuePaise Int?
+  attemptCount              Int       @default(0)
+  nextEligibleAt            DateTime?
+  stoppedReason             String?
+  policyVersion             Int
+  replacementSessionId      String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  session CheckoutSession  @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+  actions RecoveryAction[]
+
+  @@index([status])
+  @@index([nextEligibleAt])
+  @@index([createdAt])
+}
+
+/// Merchant-approved simulated recovery action (no real messaging).
+model RecoveryAction {
+  id             String    @id @default(cuid())
+  recoveryCaseId String
+  actionType     String
+  messagePreview String
+  copyMode       String    @default("template")
+  copyVersion    String    @default("v1")
+  approvedBy     String
+  executedAt     DateTime?
+  result         String
+  metadata       Json
+  createdAt      DateTime  @default(now())
+
+  recoveryCase RecoveryCase @relation(fields: [recoveryCaseId], references: [id], onDelete: Cascade)
+
+  @@index([recoveryCaseId])
 }
 
 model CheckoutSession {
@@ -49,10 +139,12 @@ model CheckoutSession {
 
   items       CheckoutItem[]
   auditEvents AuditEvent[]
+  recoveryCase RecoveryCase?
 
   @@index([cartHash])
   @@index([status])
   @@index([cartHash, status])
+  @@index([createdAt])
 }
 
 model CheckoutItem {
@@ -72,19 +164,21 @@ model CheckoutItem {
 }
 
 model AuditEvent {
-  id           String   @id @default(cuid())
-  sessionId    String
+  id           String    @id @default(cuid())
+  // Null sessionId = global (merchant-level) chain, e.g. policy changes.
+  sessionId    String?
   eventType    String
   actor        String
   payload      Json
   previousHash String?
   eventHash    String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
-  session CheckoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session CheckoutSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([sessionId, createdAt])
+  @@index([eventType])
 }
 
 model PolicyConfig {

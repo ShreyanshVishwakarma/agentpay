@@ -9,6 +9,7 @@ export const AUDIT_ACTORS = [
   "POLICY_ENGINE",
   "SYSTEM",
   "RAZORPAY",
+  "MERCHANT",
 ] as const;
 
 export const auditActorSchema = z.enum(AUDIT_ACTORS);
@@ -36,6 +37,18 @@ export const AUDIT_EVENT_TYPES = [
   "RAZORPAY_WEBHOOK_REJECTED",
   "WEBHOOK_EVENT_DUPLICATE",
   "PAYMENT_VERIFIED_VIA_WEBHOOK",
+  "POLICY_CHANGED",
+  "POLICY_SIMULATION_RUN",
+  "REVENUE_OPPORTUNITY_IDENTIFIED",
+  "RECOVERY_CASE_CREATED",
+  "RECOVERY_PROPOSED",
+  "RECOVERY_APPROVED",
+  "RECOVERY_EXECUTED",
+  "RECOVERY_BUYER_REENGAGED",
+  "RECOVERY_SUCCEEDED",
+  "RECOVERY_STOPPED",
+  "RECOVERY_EXPIRED",
+  "ALTERNATIVE_PRODUCT_OFFERED",
 ] as const;
 
 export const auditEventTypeSchema = z.enum(AUDIT_EVENT_TYPES);
@@ -64,34 +77,49 @@ export const AUDIT_EVENT_SUMMARIES: Record<AuditEventType, string> = {
   RAZORPAY_WEBHOOK_REJECTED: "Webhook rejected — signature verification failed",
   WEBHOOK_EVENT_DUPLICATE: "Duplicate webhook delivery ignored (already processed)",
   PAYMENT_VERIFIED_VIA_WEBHOOK: "Payment verified and fulfilled via webhook pipeline",
+  POLICY_CHANGED: "Merchant AI-commerce policy updated (new version)",
+  POLICY_SIMULATION_RUN: "Policy simulator evaluated a scenario (no side effects)",
+  REVENUE_OPPORTUNITY_IDENTIFIED: "Recoverable revenue opportunity identified",
+  RECOVERY_CASE_CREATED: "Recovery case opened for checkout session",
+  RECOVERY_PROPOSED: "Recovery intervention proposed for merchant review",
+  RECOVERY_APPROVED: "Merchant approved simulated recovery action",
+  RECOVERY_EXECUTED: "Simulated recovery action executed in-app",
+  RECOVERY_BUYER_REENGAGED: "Buyer re-engaged with recovery offer",
+  RECOVERY_SUCCEEDED: "Recovered checkout completed verified payment",
+  RECOVERY_STOPPED: "Recovery case stopped by stopping rule or decline",
+  RECOVERY_EXPIRED: "Recovery case expired without buyer action",
+  ALTERNATIVE_PRODUCT_OFFERED: "Lower-priced alternative offered to buyer",
 };
 
 export interface RecordAuditEventInput {
-  sessionId: string;
+  /** Omit for merchant-level (global chain) events such as policy changes. */
+  sessionId?: string;
   eventType: AuditEventType;
   actor: AuditActor;
   payload?: Record<string, unknown>;
 }
 
 /**
- * Append an event to the session's hash chain. The previous hash is read
- * inside a transaction so concurrent writers cannot fork the chain.
+ * Append an event to a session's hash chain — or to the global merchant
+ * chain when no sessionId is given. The previous hash is read inside a
+ * transaction so concurrent writers cannot fork the chain.
  */
 export async function recordAuditEvent(
   input: RecordAuditEventInput,
 ): Promise<{ id: string; eventHash: string }> {
   const payload = sanitizePayload(input.payload ?? {});
+  const sessionId = input.sessionId ?? null;
 
   return db.$transaction(async (tx) => {
     const lastEvent = await tx.auditEvent.findFirst({
-      where: { sessionId: input.sessionId },
+      where: { sessionId },
       orderBy: { createdAt: "desc" },
       select: { eventHash: true },
     });
 
     const previousHash = lastEvent?.eventHash ?? null;
     const eventHash = computeEventHash(previousHash, {
-      sessionId: input.sessionId,
+      sessionId,
       eventType: input.eventType,
       actor: input.actor,
       payload,
@@ -99,7 +127,7 @@ export async function recordAuditEvent(
 
     const created = await tx.auditEvent.create({
       data: {
-        sessionId: input.sessionId,
+        sessionId,
         eventType: input.eventType,
         actor: input.actor,
         payload: payload as never,
@@ -143,5 +171,18 @@ export async function verifySessionChain(
   sessionId: string,
 ): Promise<ChainVerificationResult> {
   const events = await getSessionEvents(sessionId);
+  return verifyHashChain(events);
+}
+
+/** Global merchant-level chain: policy changes, simulations, etc. */
+export async function getGlobalAuditEvents() {
+  return db.auditEvent.findMany({
+    where: { sessionId: null },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function verifyGlobalChain(): Promise<ChainVerificationResult> {
+  const events = await getGlobalAuditEvents();
   return verifyHashChain(events);
 }

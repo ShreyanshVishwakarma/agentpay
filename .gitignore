@@ -49,3 +49,6 @@ dev.db
 
 # local logs
 *.log
+
+# test database
+prisma/test.db

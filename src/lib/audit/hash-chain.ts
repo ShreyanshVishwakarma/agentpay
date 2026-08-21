@@ -13,7 +13,7 @@ import { sha256Hex, stableStringify } from "@/lib/hash-utils";
  */
 export interface ChainEvent {
   id: string;
-  sessionId: string;
+  sessionId: string | null;
   eventType: string;
   actor: string;
   payload: unknown;
@@ -24,7 +24,7 @@ export interface ChainEvent {
 export function computeEventHash(
   previousHash: string | null,
   event: {
-    sessionId: string;
+    sessionId: string | null;
     eventType: string;
     actor: string;
     payload: unknown;
