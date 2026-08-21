@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -71,8 +71,12 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-export function AgentWorkspace() {
-  const [phase, setPhase] = useState<Phase>("idle");
+export function AgentWorkspace({
+  resumeSessionId = null,
+}: {
+  resumeSessionId?: string | null;
+}) {
+  const [phase, setPhase] = useState<Phase>(resumeSessionId ? "previewing" : "idle");
   const [mode, setMode] = useState<"llm" | "fallback" | null>(null);
   const [intent, setIntent] = useState<PurchaseIntent | null>(null);
   const [preview, setPreview] = useState<PreviewApproved | null>(null);
@@ -100,6 +104,41 @@ export function AgentWorkspace() {
       // Non-critical — the timeline just stays stale.
     }
   }, []);
+
+  // Resume flow: /buy?resume=<sessionId> re-validates the session server-side
+  // and shows the standard confirmation UI.
+  useEffect(() => {
+    if (!resumeSessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/checkout/session/${resumeSessionId}`, {
+          cache: "no-store",
+        });
+        const data = (await response.json()) as
+          | (Omit<PreviewApproved, "status"> & { status: "RESUMABLE" })
+          | { error: { code: string; message: string } };
+        if (cancelled) return;
+        if ("error" in data) {
+          setParseError(data.error.message);
+          setPhase("idle");
+          return;
+        }
+        setSessionId(data.sessionId);
+        setPreview({ ...data, status: "AWAITING_CONFIRMATION" });
+        setPhase("ready");
+        void refreshAudit(data.sessionId);
+      } catch {
+        if (!cancelled) {
+          setParseError("Could not resume this checkout. Please start a new request.");
+          setPhase("idle");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeSessionId, refreshAudit]);
 
   const handleSubmit = useCallback(
     async (message: string) => {

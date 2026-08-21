@@ -5,7 +5,13 @@ export const metadata: Metadata = {
   title: "Agent Checkout — AgentPay",
 };
 
-export default function BuyPage() {
+export default async function BuyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ resume?: string }>;
+}) {
+  const { resume } = await searchParams;
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6">
@@ -17,7 +23,7 @@ export default function BuyPage() {
           policy decides, and nothing is charged until you confirm.
         </p>
       </div>
-      <AgentWorkspace />
+      <AgentWorkspace resumeSessionId={resume ?? null} />
     </div>
   );
 }
