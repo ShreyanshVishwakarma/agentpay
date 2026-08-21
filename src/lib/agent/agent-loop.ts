@@ -20,8 +20,24 @@ export interface AgentTraceStep {
   resultSummary: string;
 }
 
+export interface UpsellSuggestion {
+  sku: string;
+  name: string;
+  pricePaise: number;
+  formattedPrice: string;
+  kind: string;
+  reason: string;
+  bound: string;
+}
+
 export type AgentOutcome =
-  | { type: "proposal"; sessionId: string; totalPaise: number; formattedTotal: string }
+  | {
+      type: "proposal";
+      sessionId: string;
+      totalPaise: number;
+      formattedTotal: string;
+      upsells?: UpsellSuggestion[];
+    }
   | { type: "rejection"; code: string; message: string }
   | { type: "clarification"; question: string };
 
@@ -262,6 +278,7 @@ async function runWithLlm(message: string): Promise<AgentRunResult> {
           sessionId: proposal.sessionId,
           totalPaise: proposal.totalPaise ?? 0,
           formattedTotal: proposal.formattedTotal ?? "",
+          upsells: proposal.upsells,
         },
       };
     }
@@ -281,6 +298,7 @@ async function runWithLlm(message: string): Promise<AgentRunResult> {
         sessionId: proposal.sessionId,
         totalPaise: proposal.totalPaise ?? 0,
         formattedTotal: proposal.formattedTotal ?? "",
+        upsells: proposal.upsells,
       },
     };
   }
@@ -383,6 +401,7 @@ async function runWithPlanner(message: string): Promise<AgentRunResult> {
         sessionId: result.sessionId,
         totalPaise: result.totalPaise ?? 0,
         formattedTotal: result.formattedTotal ?? "",
+        upsells: result.upsells,
       },
     };
   }

@@ -74,6 +74,7 @@ export async function POST(request: Request) {
             ],
             reusedSession: false,
             razorpayOrderCreated: false,
+            recommendedAddOns: result.outcome.upsells ?? [],
           },
         },
       });

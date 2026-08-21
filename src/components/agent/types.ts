@@ -22,10 +22,20 @@ export interface PreviewItem {
   formattedLineTotal: string;
 }
 
+export interface RecommendedAddOn {
+  sku: string;
+  name: string;
+  pricePaise: number;
+  formattedPrice: string;
+  kind: string;
+  reason: string;
+  bound: string;
+}
+
 export interface PreviewApproved {
   status: "AWAITING_CONFIRMATION";
   sessionId: string;
-  cartHash: string;
+  cartHash?: string;
   items: PreviewItem[];
   totalPaise: number;
   formattedTotal: string;
@@ -34,6 +44,7 @@ export interface PreviewApproved {
   policyExplanation: string[];
   reusedSession: boolean;
   razorpayOrderCreated: false;
+  recommendedAddOns?: RecommendedAddOn[];
 }
 
 export interface PreviewRejected {

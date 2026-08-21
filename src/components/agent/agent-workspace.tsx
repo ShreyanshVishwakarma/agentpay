@@ -85,6 +85,7 @@ export function AgentWorkspace({
   const [trace, setTrace] = useState<
     Array<{ tool: string; args: Record<string, unknown>; resultSummary: string }>
   >([]);
+  const [addOnBusySku, setAddOnBusySku] = useState<string | null>(null);
   const [mode, setMode] = useState<"llm" | "fallback" | null>(null);
   const [intent, setIntent] = useState<PurchaseIntent | null>(null);
   const [preview, setPreview] = useState<PreviewApproved | null>(null);
@@ -343,6 +344,47 @@ export function AgentWorkspace({
     [verifyPaymentCallback],
   );
 
+  const handleAddAddOn = useCallback(
+    async (sku: string) => {
+      if (!preview) return;
+      setAddOnBusySku(sku);
+      try {
+        const intent: PurchaseIntent = {
+          items: [
+            ...preview.items.map((item) => ({ sku: item.sku, quantity: item.quantity })),
+            { sku, quantity: 1 },
+          ],
+          maxBudgetPaise: preview.budgetPaise ?? undefined,
+          clarificationNeeded: false,
+        };
+        const outcome = await postJson<
+          PreviewApproved | PreviewRejected | { error: { message: string } }
+        >("/api/checkout/preview", {
+          intent,
+          sourceMessage: `add-on ${sku}`,
+        });
+        if ("error" in outcome) {
+          setNotice(outcome.error.message);
+          return;
+        }
+        if (outcome.status === "REJECTED") {
+          setRejection(outcome);
+          setPreview(null);
+          setPhase("failed");
+          return;
+        }
+        setPreview(outcome);
+        setSessionId(outcome.sessionId);
+        void refreshAudit(outcome.sessionId);
+      } catch {
+        setNotice("Could not add the suggestion. Please retry.");
+      } finally {
+        setAddOnBusySku(null);
+      }
+    },
+    [preview, refreshAudit],
+  );
+
   const handleConfirm = useCallback(async () => {
     if (!preview || confirmingRef.current) return;
     confirmingRef.current = true;
@@ -517,6 +559,8 @@ export function AgentWorkspace({
                 preview={preview}
                 onConfirm={handleConfirm}
                 confirming={phase === "confirming"}
+                onAddAddOn={handleAddAddOn}
+                addOnBusySku={addOnBusySku}
               />
             </>
           )}

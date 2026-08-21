@@ -80,12 +80,23 @@ export interface ProposalToolResult {
   rejectionCode?: string;
   message?: string;
   suggestedAction?: string;
+  upsells?: Array<{
+    sku: string;
+    name: string;
+    pricePaise: number;
+    formattedPrice: string;
+    kind: string;
+    reason: string;
+    bound: string;
+  }>;
   note: string;
 }
 
 /**
  * Turns a cart into a bounded checkout proposal through the normal policy
  * pipeline. Creates an AWAITING_CONFIRMATION session — never an order.
+ * Attaches policy-compliant upsell/cross-sell suggestions when merchant
+ * policy allows agent recommendations.
  */
 export async function proposeCheckout(params: {
   items: Array<{ sku: string; quantity: number }>;
@@ -111,11 +122,45 @@ export async function proposeCheckout(params: {
     };
   }
 
+  // Growth layer: bounded recommendations, gated by merchant policy.
+  const { getPolicyConfig } = await import("@/lib/checkout/policy-engine");
+  const { getRecommendationsForCart } = await import("@/lib/growth/recommendations");
+  const { recordAuditEvent } = await import("@/lib/audit/audit-service");
+
+  const policy = await getPolicyConfig();
+  let upsells: ProposalToolResult["upsells"] = undefined;
+
+  if (policy.agentCanRecommend) {
+    const recommendations = await getRecommendationsForCart({
+      skus: outcome.items.map((item) => item.sku),
+      cartTotalPaise: outcome.totalPaise,
+      budgetPaise: outcome.budgetPaise,
+    });
+    if (recommendations.length > 0) {
+      upsells = recommendations;
+      await recordAuditEvent({
+        sessionId: outcome.sessionId,
+        eventType: "PRODUCT_RECOMMENDED",
+        actor: "AGENT",
+        payload: {
+          recommendations: recommendations.map((rec) => ({
+            sku: rec.sku,
+            kind: rec.kind,
+            pricePaise: rec.pricePaise,
+          })),
+          boundedByBudget: outcome.budgetPaise !== null,
+          policyVersion: policy.policyVersion,
+        },
+      });
+    }
+  }
+
   return {
     status: "PROPOSAL_READY",
     sessionId: outcome.sessionId,
     totalPaise: outcome.totalPaise,
     formattedTotal: outcome.formattedTotal,
+    upsells,
     note: "Proposal created. The human buyer must explicitly confirm before any payment.",
   };
 }

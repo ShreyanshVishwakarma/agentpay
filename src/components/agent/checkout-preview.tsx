@@ -29,12 +29,19 @@ export function CheckoutPreview({
   preview,
   onConfirm,
   confirming,
+  onAddAddOn,
+  addOnBusySku,
 }: {
   preview: PreviewApproved;
   onConfirm: () => void;
   confirming: boolean;
+  onAddAddOn?: (sku: string) => void;
+  addOnBusySku?: string | null;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const addOns = (preview.recommendedAddOns ?? []).filter(
+    (addOn) => !preview.items.some((item) => item.sku === addOn.sku),
+  );
 
   return (
     <Card className="border-border/80 shadow-sm">
@@ -75,6 +82,43 @@ export function CheckoutPreview({
         </div>
 
         <Separator />
+
+        {addOns.length > 0 && onAddAddOn && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Frequently paired — agent suggestions (bounded by policy)
+            </p>
+            {addOns.map((addOn) => (
+              <div
+                key={addOn.sku}
+                className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50/50 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {addOn.name}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      +{addOn.formattedPrice}
+                    </span>
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground" title={addOn.bound}>
+                    {addOn.reason} · {addOn.bound}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={confirming || addOnBusySku === addOn.sku}
+                  onClick={() => onAddAddOn(addOn.sku)}
+                >
+                  {addOnBusySku === addOn.sku ? "Checking…" : "+ Add"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {addOns.length > 0 && <Separator />}
 
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between">

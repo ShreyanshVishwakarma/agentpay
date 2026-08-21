@@ -49,6 +49,7 @@ export const AUDIT_EVENT_TYPES = [
   "RECOVERY_STOPPED",
   "RECOVERY_EXPIRED",
   "ALTERNATIVE_PRODUCT_OFFERED",
+  "PRODUCT_RECOMMENDED",
 ] as const;
 
 export const auditEventTypeSchema = z.enum(AUDIT_EVENT_TYPES);
@@ -89,6 +90,7 @@ export const AUDIT_EVENT_SUMMARIES: Record<AuditEventType, string> = {
   RECOVERY_STOPPED: "Recovery case stopped by stopping rule or decline",
   RECOVERY_EXPIRED: "Recovery case expired without buyer action",
   ALTERNATIVE_PRODUCT_OFFERED: "Lower-priced alternative offered to buyer",
+  PRODUCT_RECOMMENDED: "Bounded upsell/cross-sell recommendation attached to proposal",
 };
 
 export interface RecordAuditEventInput {

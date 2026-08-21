@@ -8,6 +8,25 @@
 
 ---
 
+## Problem-statement alignment
+
+**Track: AI Growth & Agentic Commerce — "Grow the merchant's revenue, and make them sellable to AI buyers."**
+
+| Problem-statement direction | Where it lives |
+|---|---|
+| Conversational in-app checkout | `/buy` Agent mode — LLM drives `search_catalog → get_product → propose_checkout` tool calls and builds the cart itself; stops at explicit human confirmation |
+| Agent-readable catalog | `GET /api/catalog` (discovery-filtered, policy-capped) + machine proposal API `POST /api/agent/v1/proposals` for external agents |
+| Upsell & cross-sell agent | Deterministic recommendation engine (`src/lib/growth/recommendations.ts`) attached to every proposal — budget-bounded, stock-checked, gated by the merchant's `agentCanRecommend` toggle, audited as `PRODUCT_RECOMMENDED` |
+| Campaign orchestrator | Recovery queue is the bounded v1: merchant-approved, rule-driven re-engagement of failed intent (roadmap: broader campaigns) |
+| Every money action explainable, bounded, gated | Policy engine codes name the exact control; confirmation gate; server-side HMAC verification; idempotent webhooks; hash-chained audit |
+
+## Resources you must provide (real-project setup)
+
+1. **Razorpay test-mode API keys** — Dashboard → Settings → API Keys → generate *Test* keys → put in `.env` as `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`. No KYC needed for test mode.
+2. **A public HTTPS URL for webhooks** — Dashboard → Settings → Webhooks → create webhook pointing to `https://<your-domain>/api/webhooks/razorpay`, subscribe to `payment.captured`, `payment.failed`, `order.paid`, and set a webhook secret → put it in `RAZORPAY_WEBHOOK_SECRET`. For local development use a tunnel (e.g. `ngrok http 3000`) or skip — the browser-callback path works fully without it.
+3. **Test payment instruments** — no setup needed; use Razorpay's documented test cards (`4111 1111 1111 1111`, any future expiry/CVV) or test UPI IDs (`success@razorpay`).
+4. **Optional: OpenAI-compatible key** — `OPENAI_API_KEY`/`OPENAI_MODEL` for real LLM agent-mode reasoning and LLM recovery copy. Empty values run deterministic fallbacks everywhere.
+
 ## What makes AgentPay different?
 
 - **AI proposes but cannot spend.** The LLM only extracts intent through a strict Zod schema; it never sets prices, overrides inventory, creates orders, or declares success.
