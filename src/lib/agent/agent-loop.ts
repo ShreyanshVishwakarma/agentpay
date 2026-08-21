@@ -218,6 +218,7 @@ async function runWithLlm(message: string): Promise<AgentRunResult> {
   ];
 
   let proposal: ProposalToolResult | null = null;
+  let lastRejection: ProposalToolResult | null = null;
 
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     const response = await fetch(
@@ -234,7 +235,7 @@ async function runWithLlm(message: string): Promise<AgentRunResult> {
           messages,
           tools: TOOL_DEFINITIONS,
         }),
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(90_000),
       },
     );
     if (!response.ok) throw new Error(`LLM API status ${response.status}`);
@@ -258,6 +259,7 @@ async function runWithLlm(message: string): Promise<AgentRunResult> {
         if (call.function.name === "propose_checkout") {
           const maybe = result as ProposalToolResult;
           if (maybe.status === "PROPOSAL_READY") proposal = maybe;
+          if (maybe.status === "REJECTED") lastRejection = maybe;
         }
         messages.push({
           role: "tool",
@@ -279,6 +281,22 @@ async function runWithLlm(message: string): Promise<AgentRunResult> {
           totalPaise: proposal.totalPaise ?? 0,
           formattedTotal: proposal.formattedTotal ?? "",
           upsells: proposal.upsells,
+        },
+      };
+    }
+    // Policy rejected the proposed cart — surface it structurally, with the
+    // model's explanation when it has one.
+    if (lastRejection) {
+      return {
+        mode: "llm",
+        trace,
+        outcome: {
+          type: "rejection",
+          code: lastRejection.rejectionCode ?? "INVALID_INTENT",
+          message:
+            (assistant.content && assistant.content.trim().length > 0
+              ? assistant.content.trim()
+              : lastRejection.message) ?? "The cart was rejected by merchant policy.",
         },
       };
     }
