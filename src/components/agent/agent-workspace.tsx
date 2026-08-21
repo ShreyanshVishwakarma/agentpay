@@ -5,9 +5,11 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowRight,
+  Bot,
   History,
   Info,
   ScrollText,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +19,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { AgentChat } from "@/components/agent/agent-chat";
 import { IntentCard } from "@/components/agent/intent-card";
 import { CheckoutPreview } from "@/components/agent/checkout-preview";
@@ -77,6 +81,10 @@ export function AgentWorkspace({
   resumeSessionId?: string | null;
 }) {
   const [phase, setPhase] = useState<Phase>(resumeSessionId ? "previewing" : "idle");
+  const [agentMode, setAgentMode] = useState(true);
+  const [trace, setTrace] = useState<
+    Array<{ tool: string; args: Record<string, unknown>; resultSummary: string }>
+  >([]);
   const [mode, setMode] = useState<"llm" | "fallback" | null>(null);
   const [intent, setIntent] = useState<PurchaseIntent | null>(null);
   const [preview, setPreview] = useState<PreviewApproved | null>(null);
@@ -154,6 +162,55 @@ export function AgentWorkspace({
       setSessionId(null);
       setAuditEvents([]);
       setMode(null);
+      setTrace([]);
+
+      if (agentMode) {
+        // Autonomous buying-agent loop: the LLM drives merchant API tools.
+        try {
+          const response = await postJson<
+            | {
+                mode: "llm" | "fallback";
+                trace: Array<{ tool: string; args: Record<string, unknown>; resultSummary: string }>;
+                outcome:
+                  | { type: "proposal"; sessionId: string; preview: PreviewApproved }
+                  | { type: "rejection"; code: string; message: string }
+                  | { type: "clarification"; question: string };
+              }
+            | { error: { message: string } }
+          >("/api/agent/v1/chat", { message });
+
+          if ("error" in response) {
+            setParseError(response.error.message);
+            setPhase("idle");
+            return;
+          }
+
+          setTrace(response.trace);
+          setMode(response.mode);
+
+          if (response.outcome.type === "proposal") {
+            setSessionId(response.outcome.sessionId);
+            setPreview(response.outcome.preview);
+            setNotice("The agent built this cart autonomously. You decide whether to pay.");
+            setPhase("ready");
+            void refreshAudit(response.outcome.sessionId);
+          } else if (response.outcome.type === "rejection") {
+            setRejection({
+              message: response.outcome.message,
+              suggestedAction: "Adjust the request within merchant policy.",
+            });
+            setPhase("failed");
+            setSessionId(null);
+          } else {
+            setParseError(response.outcome.question);
+            setPhase("idle");
+          }
+        } catch {
+          setParseError("The buying agent could not complete your request.");
+          setPhase("idle");
+        }
+        return;
+      }
 
       let intent: PurchaseIntent;
       let mode: "llm" | "fallback";
@@ -209,7 +266,7 @@ export function AgentWorkspace({
         setPhase("idle");
       }
     },
-    [refreshAudit],
+    [agentMode, refreshAudit],
   );
 
   const verifyPaymentCallback = useCallback(
@@ -350,16 +407,65 @@ export function AgentWorkspace({
         <div className="space-y-4">
           <Card className="border-border/80 shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">What would you like to buy?</CardTitle>
-              <CardDescription>
-                Type a natural-language request. AgentPay converts it into a
-                bounded purchase you control.
-              </CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm">What would you like to buy?</CardTitle>
+                  <CardDescription>
+                    Type a natural-language request. AgentPay converts it into a
+                    bounded purchase you control.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Switch
+                    id="agent-mode"
+                    checked={agentMode}
+                    onCheckedChange={setAgentMode}
+                  />
+                  <Label htmlFor="agent-mode" className="flex items-center gap-1 text-xs font-medium">
+                    <Bot className="size-3.5 text-primary" />
+                    Agent mode
+                  </Label>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <AgentChat onSubmit={handleSubmit} busy={busy} mode={mode} />
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {agentMode
+                  ? "Agent mode: an LLM drives merchant API tools — search_catalog, get_product, propose_checkout — to build this cart itself. It still cannot pay."
+                  : "Assistant mode: the LLM only extracts structured intent from your sentence."}
+              </p>
             </CardContent>
           </Card>
+
+          {trace.length > 0 && (
+            <Card className="border-border/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Wrench className="size-4 text-primary" />
+                  Agent tool trace
+                </CardTitle>
+                <CardDescription>
+                  Every call the agent made — deterministic tools, server-side data.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {trace.map((step, index) => (
+                  <div
+                    key={`${step.tool}-${index}`}
+                    className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5"
+                  >
+                    <p className="font-mono text-[11px] font-medium text-indigo-700">
+                      {index + 1}. {step.tool}()
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground" title={step.resultSummary}>
+                      → {step.resultSummary}
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {intent && <IntentCard intent={intent} mode={mode} />}
 
