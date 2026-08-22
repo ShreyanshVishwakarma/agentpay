@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/page-header";
 import {
   ConversionFunnel,
   InsightsSummaryCards,
@@ -33,31 +34,29 @@ export default async function MerchantInsightsPage() {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Agentic Revenue Opportunities
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Safe agentic commerce is a growth channel: see where intent
-            converts, where policy prevented losses, and which failed checkouts
-            can be recovered within merchant rules.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm" className="gap-1.5">
-            <Link href="/merchant/recovery">
-              Recovery queue
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </Button>
-          <Badge variant="outline" className="gap-1 border-border bg-muted text-[10px] uppercase text-muted-foreground">
-            <RefreshCw className="size-3" />
-            Synthetic demo data
-          </Badge>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
+      <PageHeader
+        kicker="Merchant console · revenue"
+        title="Agentic revenue opportunities"
+        description="Safe agentic commerce is a growth channel: see where intent converts, where policy prevented losses, and which failed checkouts can be recovered within merchant rules."
+        actions={
+          <>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link href="/merchant/recovery">
+                Recovery queue
+                <ArrowRight className="size-3.5" />
+              </Link>
+            </Button>
+            <Badge
+              variant="outline"
+              className="gap-1 border-border bg-muted text-[10px] uppercase text-muted-foreground"
+            >
+              <RefreshCw className="size-3" />
+              Synthetic demo data
+            </Badge>
+          </>
+        }
+      />
 
       <InsightsSummaryCards insights={insights} />
 

@@ -172,24 +172,24 @@ export default function HomePage() {
       <section className="ambient-pools -mx-4 mt-2 rounded-b-3xl px-4 pb-14 pt-14 sm:-mx-6 sm:px-6 sm:pb-16 sm:pt-20">
         <div className="grid items-center gap-12 lg:grid-cols-12">
           <div className="lg:col-span-7">
-            <span className="inline-flex items-center gap-2 rounded-md border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-accent-foreground shadow-card-tinted">
+            <span className="fade-up inline-flex items-center gap-2 rounded-md border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-accent-foreground shadow-card-tinted">
               <ShieldCheck className="size-3.5 text-primary" />
               Razorpay Hackathon · Track 01 · Agentic commerce
             </span>
-            <h1 className="mt-6 max-w-xl font-display text-4xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-5xl lg:text-6xl">
+            <h1 className="fade-up mt-6 max-w-xl font-display text-4xl font-bold leading-[1.05] tracking-tighter text-foreground [animation-delay:90ms] sm:text-5xl lg:text-6xl">
               The control plane for safe AI commerce.
             </h1>
-            <p className="mt-6 max-w-[38rem] text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
+            <p className="fade-up mt-6 max-w-[38rem] text-pretty text-base leading-relaxed text-muted-foreground [animation-delay:180ms] sm:text-lg">
               AgentPay lets businesses expose products to AI buyers with hard
               limits on autonomous purchase behavior — and recovers failed
               payment intent inside merchant rules instead of losing it.
             </p>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground/90">
+            <p className="fade-up mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground/90 [animation-delay:240ms]">
               Agents can discover, recommend and prepare purchases. They cannot
               spend money, create an order, or touch inventory without
               deterministic controls and a verifiable event trail.
             </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3">
+            <div className="fade-up mt-9 flex flex-wrap items-center gap-3 [animation-delay:320ms]">
               <Button asChild size="lg" className="gap-2">
                 <Link href="/buy">
                   Try the agent
@@ -202,7 +202,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="lg:col-span-5">
+          <div className="fade-up lg:col-span-5 [animation-delay:220ms]">
             <PolicyLedgerCard />
           </div>
         </div>

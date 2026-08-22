@@ -3,6 +3,7 @@ import { ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CatalogTable } from "@/components/catalog/catalog-table";
+import { PageHeader } from "@/components/shared/page-header";
 import { db } from "@/lib/db";
 import { getPolicyConfig } from "@/lib/checkout/policy-engine";
 
@@ -19,25 +20,20 @@ export default async function MerchantCatalogPage() {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {policy.merchantName}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The single source of truth for prices and stock. AI agents must use
-            these SKUs and server-provided prices — client-supplied values are
-            never trusted.
-          </p>
-        </div>
-        <Button asChild variant="outline" className="gap-2">
-          <a href="/api/catalog" target="_blank" rel="noopener noreferrer">
-            Open raw catalog JSON
-            <ExternalLink className="size-3.5" />
-          </a>
-        </Button>
-      </div>
+    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
+      <PageHeader
+        kicker="Merchant console · catalog"
+        title={policy.merchantName}
+        description="The single source of truth for prices and stock. AI agents must use these SKUs and server-provided prices — client-supplied values are never trusted."
+        actions={
+          <Button asChild variant="outline" className="gap-2">
+            <a href="/api/catalog" target="_blank" rel="noopener noreferrer">
+              Open raw catalog JSON
+              <ExternalLink className="size-3.5" />
+            </a>
+          </Button>
+        }
+      />
 
       <Card className="mb-6 border-primary/25 bg-accent/50">
         <CardContent className="flex items-start gap-2.5 pt-6 text-sm text-accent-foreground">

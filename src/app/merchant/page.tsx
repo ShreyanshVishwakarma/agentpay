@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { PageHeader } from "@/components/shared/page-header";
 import {
   ConversionFunnel,
   InsightsSummaryCards,
@@ -52,33 +53,31 @@ export default async function MerchantOverviewPage() {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Merchant Overview
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            SkillForge Learning · the control plane for safe AI commerce.
-            Agents can discover and propose — your policies decide what money
-            can move.
-          </p>
-        </div>
-        <Button asChild size="sm" className="gap-1.5">
-          <Link href="/buy">
-            Open agent checkout
-            <ArrowRight className="size-3.5" />
-          </Link>
-        </Button>
-      </div>
+    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
+      <PageHeader
+        kicker="Merchant console · SkillForge Learning"
+        title="Merchant overview"
+        description="The control plane for safe AI commerce. Agents can discover and propose — your policies decide what money can move."
+        actions={
+          <Button asChild size="sm" className="gap-1.5">
+            <Link href="/buy">
+              Open agent checkout
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </Button>
+        }
+      />
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {CONSOLE_LINKS.map((link) => (
-          <Link key={link.href} href={link.href}>
-            <Card className="transition-colors hover:border-ring hover:bg-accent/40">
-              <CardContent className="flex items-center gap-2.5 pt-5">
-                <link.icon className="size-4 text-primary" />
-                <span className="text-sm font-medium">{link.label}</span>
+          <Link key={link.href} href={link.href} className="group/tile">
+            <Card className="transition-all duration-300 group-hover/tile:-translate-y-0.5 group-hover/tile:border-ring group-hover/tile:shadow-lifted-tinted">
+              <CardContent className="flex items-center justify-between gap-2.5 pt-5">
+                <span className="flex items-center gap-2.5">
+                  <link.icon className="size-4 text-primary" />
+                  <span className="text-sm font-medium">{link.label}</span>
+                </span>
+                <ArrowRight className="size-3.5 -translate-x-1 text-muted-foreground opacity-0 transition-all duration-300 group-hover/tile:translate-x-0 group-hover/tile:opacity-100" />
               </CardContent>
             </Card>
           </Link>

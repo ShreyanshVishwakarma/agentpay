@@ -61,11 +61,15 @@ export default async function AuditPage({
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Audit Trail
+          <p className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+            <span aria-hidden className="size-1 rounded-full bg-primary" />
+            Audit · session
+          </p>
+          <h1 className="font-display text-3xl font-bold tracking-tighter text-foreground">
+            Session trail
           </h1>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
-            session {session.id}
+          <p className="mt-1.5 font-mono text-xs text-muted-foreground">
+            {session.id}
           </p>
         </div>
         <StatusBadge status={session.status} />

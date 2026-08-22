@@ -8,6 +8,8 @@ import {
   History,
   Info,
   ScrollText,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { AgentChat } from "@/components/agent/agent-chat";
 import { ChatTranscript } from "@/components/agent/chat-transcript";
 import type { TranscriptEntry } from "@/components/agent/chat-transcript";
+import { useReadAloud } from "@/hooks/use-read-aloud";
 import { IntentCard } from "@/components/agent/intent-card";
 import { CheckoutPreview } from "@/components/agent/checkout-preview";
 import {
@@ -31,6 +34,7 @@ import {
 import { PaymentStatus } from "@/components/agent/payment-status";
 import type { PaymentStage } from "@/components/agent/payment-status";
 import { AuditTimeline } from "@/components/audit/audit-timeline";
+import { cn } from "@/lib/utils";
 import type {
   AuditFeedResponse,
   AuditEventDto,
@@ -105,6 +109,18 @@ export function AgentWorkspace({
   const [auditEvents, setAuditEvents] = useState<AuditEventDto[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const confirmingRef = useRef(false);
+  const { enabled: readAloud, toggle: toggleReadAloud, speak } = useReadAloud();
+  const spokenNotesRef = useRef(0);
+
+  // Speak each new agent note when read-aloud is enabled.
+  useEffect(() => {
+    const notes = transcript.filter((entry) => entry.kind === "note");
+    if (notes.length > spokenNotesRef.current) {
+      const latest = notes[notes.length - 1];
+      if (latest && latest.kind === "note") speak(latest.text);
+    }
+    spokenNotesRef.current = notes.length;
+  }, [transcript, speak]);
 
   const pushErrorNote = useCallback((text: string) => {
     setTranscript((prev) => [
@@ -532,6 +548,25 @@ export function AgentWorkspace({
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleReadAloud(!readAloud)}
+                aria-pressed={readAloud}
+                title={readAloud ? "Mute reply voice" : "Read replies aloud"}
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-lg border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95",
+                  readAloud
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {readAloud ? (
+                  <Volume2 className="size-3.5" />
+                ) : (
+                  <VolumeX className="size-3.5" />
+                )}
+                <span className="sr-only">Read replies aloud</span>
+              </button>
               <Switch
                 id="agent-mode"
                 checked={agentMode}

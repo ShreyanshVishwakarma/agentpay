@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { PageHeader } from "@/components/shared/page-header";
 import { db } from "@/lib/db";
 import { formatPaise } from "@/lib/money";
 
@@ -32,16 +33,12 @@ export default async function MerchantAuditPage() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Audit Trail
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every checkout session has a tamper-evident, hash-chained event
-          history. Open any session to verify its chain.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
+      <PageHeader
+        kicker="Merchant console · audit"
+        title="Audit trail"
+        description="Every checkout session has a tamper-evident, hash-chained event history. Open any session to verify its chain."
+      />
 
       <Card className="border-border/80 shadow-sm">
         <CardHeader className="pb-3">

@@ -183,4 +183,62 @@
     );
     height: 1px;
   }
+
+  /* Voice orb ripple rings. */
+  .voice-ring {
+    border: 1px solid color-mix(in oklab, var(--primary) 45%, transparent);
+    animation: voice-ring 1.8s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+  }
+
+  /* Blinking caret for live voice transcript. */
+  .voice-caret {
+    animation: voice-caret 1s steps(1) infinite;
+  }
+
+  /* Staggered entrance for page content. */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: fade-up 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  }
+}
+
+@keyframes voice-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+@keyframes voice-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-ring,
+  .voice-caret,
+  .fade-up {
+    animation: none;
+  }
+  .fade-up {
+    opacity: 1;
+    transform: none;
+  }
 }

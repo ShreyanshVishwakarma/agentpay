@@ -100,12 +100,16 @@ const PIPELINE = [
 
 export default function ArchitecturePage() {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
+      <div className="fade-up mb-8 max-w-2xl">
+        <p className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          <span aria-hidden className="size-1 rounded-full bg-primary" />
+          System design
+        </p>
+        <h1 className="font-display text-3xl font-bold tracking-tighter text-foreground sm:text-4xl">
           Architecture
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
           AgentPay treats the LLM as an untrusted translator sitting at the
           edge of a strictly ordered pipeline. Each layer only trusts the one
           beneath it, and money only moves after a human says so.

@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/page-header";
 import { PolicyStudio } from "@/components/merchant/policy-studio";
 import { PolicySimulator } from "@/components/merchant/policy-simulator";
 import { CatalogAccessTable } from "@/components/merchant/catalog-access-table";
@@ -30,17 +31,12 @@ export default async function MerchantPoliciesPage() {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Policy Studio
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Machine-enforceable rules for AI commerce. Every save creates a new
-          immutable policy version and appends a POLICY_CHANGED event to the
-          merchant audit chain — historical checkouts are never re-evaluated.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
+      <PageHeader
+        kicker="Merchant console · policy studio"
+        title="Policy studio"
+        description="Machine-enforceable rules for AI commerce. Every save creates a new immutable policy version and appends a POLICY_CHANGED event to the merchant audit chain — historical checkouts are never re-evaluated."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="space-y-4">

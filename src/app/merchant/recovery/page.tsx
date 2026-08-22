@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/shared/page-header";
 import { RecoveryQueueActions } from "@/components/merchant/recovery-queue-actions";
 import { getRecoveryQueue } from "@/lib/recovery/recovery-service";
 import { formatPaise } from "@/lib/money";
@@ -28,17 +29,12 @@ export default async function MerchantRecoveryPage() {
   const queue = await getRecoveryQueue();
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Recovery Queue
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Failed payments and abandoned checkouts that can still convert —
-          bounded by stopping rules, approved by you, executed as in-app
-          simulations. No real email, SMS or WhatsApp is ever sent.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
+      <PageHeader
+        kicker="Merchant console · recovery"
+        title="Recovery queue"
+        description="Failed payments and abandoned checkouts that can still convert — bounded by stopping rules, approved by you, executed as in-app simulations. No real email, SMS or WhatsApp is ever sent."
+      />
 
       <div className="mb-4">
         <RecoveryQueueActions />
@@ -58,8 +54,12 @@ export default async function MerchantRecoveryPage() {
       ) : (
         <div className="space-y-3">
           {queue.map((recoveryCase) => (
-            <Link key={recoveryCase.id} href={`/merchant/recovery/${recoveryCase.id}`}>
-              <Card className="transition-colors hover:border-ring hover:bg-accent/30">
+            <Link
+              key={recoveryCase.id}
+              href={`/merchant/recovery/${recoveryCase.id}`}
+              className="group/case"
+            >
+              <Card className="transition-all duration-300 group-hover/case:-translate-y-0.5 group-hover/case:border-ring group-hover/case:shadow-lifted-tinted">
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export default async function MerchantRecoveryPage() {
                         {formatPaise(recoveryCase.expectedRecoveryValuePaise)}
                       </p>
                     </div>
-                    <ArrowRight className="size-4 text-muted-foreground" />
+                    <ArrowRight className="size-4 text-muted-foreground transition-transform duration-300 group-hover/case:translate-x-1" />
                   </div>
                 </CardContent>
               </Card>
