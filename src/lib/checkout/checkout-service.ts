@@ -437,6 +437,18 @@ export async function confirmCheckout(sessionId: string): Promise<ConfirmOutcome
   } catch (error) {
     // Release the claim so the buyer can retry confirmation.
     await revertClaim(session.id);
+    const isRazorpayError =
+      typeof error === "object" &&
+      error !== null &&
+      "publicMessage" in error &&
+      typeof (error as { publicMessage: unknown }).publicMessage === "string";
+    if (isRazorpayError) {
+      return {
+        kind: "error",
+        code: "RAZORPAY_ORDER_CREATION_FAILED",
+        message: (error as { publicMessage: string }).publicMessage,
+      };
+    }
     return {
       kind: "error",
       code: "RAZORPAY_ORDER_CREATION_FAILED",
