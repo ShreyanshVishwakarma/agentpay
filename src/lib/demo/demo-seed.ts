@@ -35,13 +35,17 @@ function daysAgo(days: number, hourJitter = true): Date {
   return date;
 }
 
-const CATALOG = [
+import { EXTENDED_CATALOG } from "@/lib/catalog/extended-catalog";
+
+const BASE_CATALOG = [
   { sku: "sql-pro-pack", name: "SQL Pro Interview Pack", pricePaise: 39900, stock: 10 },
   { sku: "nextjs-backend-pack", name: "Next.js Backend Pack", pricePaise: 49900, stock: 8 },
   { sku: "database-design-pack", name: "Database Design Pack", pricePaise: 29900, stock: 15 },
   { sku: "system-design-starter", name: "System Design Starter Kit", pricePaise: 59900, stock: 3 },
   { sku: "sold-out-bundle", name: "Premium Interview Bundle", pricePaise: 99900, stock: 0 },
 ] as const;
+
+const CATALOG = [...BASE_CATALOG, ...EXTENDED_CATALOG] as const;
 
 const DEMO_REQUESTS = [
   "[demo] Buy two SQL Pro Interview Packs under ₹800",
@@ -288,10 +292,14 @@ export async function seedBaseData(): Promise<void> {
   });
 
   for (const item of CATALOG) {
+    const description =
+      (item as { description?: string }).description ??
+      `Synthetic demo product — ${item.name}.`;
     await db.catalogItem.upsert({
       where: { sku: item.sku },
       update: {
         name: item.name,
+        description,
         pricePaise: item.pricePaise,
         stock: item.stock,
         active: true,
@@ -303,7 +311,7 @@ export async function seedBaseData(): Promise<void> {
       create: {
         sku: item.sku,
         name: item.name,
-        description: `Synthetic demo product — ${item.name}.`,
+        description,
         pricePaise: item.pricePaise,
         stock: item.stock,
         active: true,
@@ -315,15 +323,17 @@ export async function seedBaseData(): Promise<void> {
   const existingVersions = await db.merchantPolicy.count();
   if (existingVersions > 0) return;
 
-  // v1 — baseline.
+  // v1 — baseline (raised limits to support full catalog up to electronics).
   await db.merchantPolicy.create({
     data: {
       policyVersion: 1,
       merchantName: "SkillForge Learning",
-      maxOrderPaise: 100000,
+      maxOrderPaise: 20000000,
       maxItemsPerOrder: 5,
       confirmationRequired: true,
       ...DEFAULT_POLICY_VALUES,
+      maxAgentProposedCartPaise: 20000000,
+      dailyTestModeCapPaise: 50000000,
       changedBy: "Merchant Demo Admin",
       changeNote: "Initial AI-commerce policy",
     },
@@ -334,10 +344,12 @@ export async function seedBaseData(): Promise<void> {
     data: {
       policyVersion: 2,
       merchantName: "SkillForge Learning",
-      maxOrderPaise: 100000,
+      maxOrderPaise: 20000000,
       maxItemsPerOrder: 5,
       confirmationRequired: true,
       ...DEFAULT_POLICY_VALUES,
+      maxAgentProposedCartPaise: 20000000,
+      dailyTestModeCapPaise: 50000000,
       extraConfirmationThresholdPaise: 60000,
       changedBy: "Merchant Demo Admin",
       changeNote: "Lowered extra-confirmation threshold to ₹600 after review",
