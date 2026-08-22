@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { AgentWorkspace } from "@/components/agent/agent-workspace";
-import { PageHeader } from "@/components/shared/page-header";
 
 export const metadata: Metadata = {
-  title: "Agent Checkout",
+  title: "Agent Checkout — AgentPay",
 };
 
 export default async function BuyPage({
@@ -14,12 +13,15 @@ export default async function BuyPage({
   const { resume } = await searchParams;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
-      <PageHeader
-        kicker="Buyer · test mode"
-        title="Agent checkout"
-        description="Ask for what you want in plain English — typed or spoken. The AI proposes, deterministic policy decides, and nothing is charged until you confirm."
-      />
+    <div className="mx-auto w-full max-w-2xl px-4 sm:px-6">
+      <div className="flex items-center justify-between py-4">
+        <h1 className="text-sm font-semibold tracking-tight text-foreground">
+          Agent checkout
+        </h1>
+        <span className="text-[11px] text-muted-foreground">
+          The AI proposes · policy decides · you confirm
+        </span>
+      </div>
       <AgentWorkspace resumeSessionId={resume ?? null} />
     </div>
   );

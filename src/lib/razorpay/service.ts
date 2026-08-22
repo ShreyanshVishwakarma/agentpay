@@ -54,6 +54,15 @@ export async function createRazorpayOrderForSession(
     throw new Error(`Checkout session not found: ${sessionId}`);
   }
 
+  // Razorpay requires a minimum order amount of ₹1 (100 paise).
+  if (session.totalPaise < 100) {
+    throw new RazorpayApiError(
+      400,
+      `Order amount ${session.totalPaise} paise is below the Razorpay minimum of 100 paise`,
+      "Cart total is below the minimum chargeable amount.",
+    );
+  }
+
   const policy = await getPolicyConfig();
 
   // Receipt must be short, unique and lowercase alphanumeric.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* Minimal ambient types for the Web Speech API (not in TS DOM lib). */
 interface SpeechRecognitionAlternativeLike {
@@ -77,7 +77,8 @@ export function useVoiceInput(options?: {
   const rafRef = useRef<number | null>(null);
   const stoppingRef = useRef(false);
 
-  const teardownMeter = useCallback(() => {
+  // React Compiler auto-memoizes these plain functions.
+  function teardownMeter() {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -87,9 +88,9 @@ export function useVoiceInput(options?: {
     void audioCtxRef.current?.close().catch(() => undefined);
     audioCtxRef.current = null;
     levelTarget?.current?.style.setProperty("--voice-level", "0");
-  }, [levelTarget]);
+  }
 
-  const startMeter = useCallback(async () => {
+  async function startMeter() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -122,22 +123,22 @@ export function useVoiceInput(options?: {
     } catch {
       // Metering is decorative — recognition continues without it.
     }
-  }, [levelTarget]);
+  }
 
-  const stop = useCallback(() => {
+  function stop() {
     stoppingRef.current = true;
     recognitionRef.current?.stop();
     teardownMeter();
     setListening(false);
-  }, [teardownMeter]);
+  }
 
-  const reset = useCallback(() => {
+  function reset() {
     setInterim("");
     setFinalText("");
     setError(null);
-  }, []);
+  }
 
-  const start = useCallback(async () => {
+  async function start() {
     const Ctor = getRecognitionCtor();
     if (!Ctor) {
       setError("Voice input needs Chrome, Edge, or another Chromium browser.");
@@ -187,7 +188,7 @@ export function useVoiceInput(options?: {
     } catch {
       setError("Could not start voice input. Please try again.");
     }
-  }, [lang, startMeter, teardownMeter]);
+  }
 
   useEffect(() => {
     return () => {
@@ -195,7 +196,7 @@ export function useVoiceInput(options?: {
       recognitionRef.current?.abort();
       teardownMeter();
     };
-  }, [teardownMeter]);
+  });
 
   return { supported, listening, interim, finalText, error, start, stop, reset };
 }

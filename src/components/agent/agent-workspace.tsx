@@ -3,41 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight,
   Bot,
-  History,
-  Info,
-  ScrollText,
+  ShieldCheck,
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AgentChat } from "@/components/agent/agent-chat";
 import { ChatTranscript } from "@/components/agent/chat-transcript";
 import type { TranscriptEntry } from "@/components/agent/chat-transcript";
 import { useReadAloud } from "@/hooks/use-read-aloud";
-import { IntentCard } from "@/components/agent/intent-card";
-import { CheckoutPreview } from "@/components/agent/checkout-preview";
-import {
-  PolicyChecklist,
-  PolicyRejectionList,
-} from "@/components/agent/policy-checklist";
-import { PaymentStatus } from "@/components/agent/payment-status";
-import type { PaymentStage } from "@/components/agent/payment-status";
-import { AuditTimeline } from "@/components/audit/audit-timeline";
+import { CheckoutDialog } from "@/components/agent/checkout-dialog";
 import { cn } from "@/lib/utils";
 import type {
-  AuditFeedResponse,
-  AuditEventDto,
   ConfirmOrderCreated,
   ConfirmResponse,
   InterpretOk,
@@ -45,6 +24,7 @@ import type {
   PreviewRejected,
   VerifyResponse,
 } from "@/components/agent/types";
+import type { PaymentStage } from "@/components/agent/payment-status";
 import type { PurchaseIntent } from "@/schemas/agent";
 
 type Phase =
@@ -93,20 +73,14 @@ export function AgentWorkspace({
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [addOnBusySku, setAddOnBusySku] = useState<string | null>(null);
-  const [mode, setMode] = useState<"llm" | "fallback" | null>(null);
-  const [intent, setIntent] = useState<PurchaseIntent | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewApproved | null>(null);
-  const [rejection, setRejection] = useState<
-    PreviewRejected | { message: string; suggestedAction?: string } | null
-  >(null);
-  const [parseError, setParseError] = useState<string | null>(null);
   const [confirmResult, setConfirmResult] = useState<ConfirmOrderCreated | null>(
     null,
   );
   const [paymentStage, setPaymentStage] = useState<PaymentStage | null>(null);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [auditEvents, setAuditEvents] = useState<AuditEventDto[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const confirmingRef = useRef(false);
   const { enabled: readAloud, toggle: toggleReadAloud, speak } = useReadAloud();
@@ -129,15 +103,11 @@ export function AgentWorkspace({
     ]);
   }, []);
 
-  const refreshAudit = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/audit/${id}`, { cache: "no-store" });
-      if (!response.ok) return;
-      const data = (await response.json()) as AuditFeedResponse;
-      setAuditEvents(data.events);
-    } catch {
-      // Non-critical — the timeline just stays stale.
-    }
+  const pushInfoNote = useCallback((text: string) => {
+    setTranscript((prev) => [
+      ...prev,
+      { id: newEntryId(), kind: "note", tone: "info", text },
+    ]);
   }, []);
 
   // Resume flow: /buy?resume=<sessionId> re-validates the session server-side
@@ -155,12 +125,12 @@ export function AgentWorkspace({
           | { error: { code: string; message: string } };
         if (cancelled) return;
         if ("error" in data) {
-          setParseError(data.error.message);
           setPhase("idle");
           return;
         }
         setSessionId(data.sessionId);
         setPreview({ ...data, status: "AWAITING_CONFIRMATION" });
+        setCheckoutOpen(true);
         setPhase("ready");
         setTranscript((prev) => [
           ...prev,
@@ -171,10 +141,8 @@ export function AgentWorkspace({
             text: "Resumed your saved checkout — review the cart and confirm below.",
           },
         ]);
-        void refreshAudit(data.sessionId);
       } catch {
         if (!cancelled) {
-          setParseError("Could not resume this checkout. Please start a new request.");
           setPhase("idle");
         }
       }
@@ -182,22 +150,18 @@ export function AgentWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [resumeSessionId, refreshAudit]);
+  }, [resumeSessionId]);
 
   const handleSubmit = useCallback(
     async (message: string) => {
       confirmingRef.current = false;
       setPhase("parsing");
-      setParseError(null);
       setNotice(null);
       setPreview(null);
-      setRejection(null);
       setConfirmResult(null);
       setPaymentStage(null);
       setFailureMessage(null);
       setSessionId(null);
-      setAuditEvents([]);
-      setMode(null);
       setTranscript([{ id: newEntryId(), kind: "user", text: message }]);
       setStatusText(
         agentMode ? "Reading the catalog and building your cart…" : "Parsing your request…",
@@ -220,13 +184,10 @@ export function AgentWorkspace({
 
           if ("error" in response) {
             setStatusText(null);
-            setParseError(response.error.message);
             pushErrorNote(response.error.message);
             setPhase("idle");
             return;
           }
-
-          setMode(response.mode);
           setTranscript((prev) => [
             ...prev,
             ...response.trace.map((step, index) => ({
@@ -243,24 +204,22 @@ export function AgentWorkspace({
             setSessionId(response.outcome.sessionId);
             setPreview(response.outcome.preview);
             setNotice("The agent built this cart autonomously. You decide whether to pay.");
+            setCheckoutOpen(true);
             setPhase("ready");
-            void refreshAudit(response.outcome.sessionId);
           } else if (response.outcome.type === "rejection") {
             setStatusText(null);
-            setRejection({
-              message: response.outcome.message,
-              suggestedAction: "Adjust the request within merchant policy.",
-            });
+            pushErrorNote(
+              `${response.outcome.code}: ${response.outcome.message}`,
+            );
             setPhase("failed");
             setSessionId(null);
           } else {
             setStatusText(null);
-            setParseError(response.outcome.question);
+            pushInfoNote(response.outcome.question);
             setPhase("idle");
           }
         } catch {
           setStatusText(null);
-          setParseError("The buying agent could not complete your request.");
           pushErrorNote("The buying agent could not complete your request.");
           setPhase("idle");
         }
@@ -268,30 +227,23 @@ export function AgentWorkspace({
       }
 
       let intent: PurchaseIntent;
-      let mode: "llm" | "fallback";
       try {
         const parsed = await postJson<
           InterpretOk | { error: { message: string } }
         >("/api/agent/interpret", { message });
         if ("error" in parsed) {
           setStatusText(null);
-          setParseError(parsed.error.message);
           pushErrorNote(parsed.error.message);
           setPhase("idle");
           return;
         }
         intent = parsed.intent;
-        mode = parsed.mode;
       } catch {
         setStatusText(null);
-        setParseError("Could not reach the agent service. Please try again.");
         pushErrorNote("Could not reach the agent service. Please try again.");
         setPhase("idle");
         return;
       }
-
-      setIntent(intent);
-      setMode(mode);
 
       setPhase("previewing");
       setStatusText("Checking merchant policy…");
@@ -303,20 +255,18 @@ export function AgentWorkspace({
         setStatusText(null);
 
         if ("error" in outcome) {
-          setParseError(outcome.error.message);
           pushErrorNote(outcome.error.message);
           setPhase("idle");
           return;
         }
 
         setSessionId(outcome.sessionId);
-        void refreshAudit(outcome.sessionId);
 
         if (outcome.status === "REJECTED") {
-          setRejection(outcome);
           setPhase("failed");
         } else {
           setPreview(outcome);
+          setCheckoutOpen(true);
           if (outcome.reusedSession) {
             setNotice(
               "Existing secure checkout reused; no duplicate order was created.",
@@ -326,12 +276,11 @@ export function AgentWorkspace({
         }
       } catch {
         setStatusText(null);
-        setParseError("Could not prepare your checkout. Please try again.");
         pushErrorNote("Could not prepare your checkout. Please try again.");
         setPhase("idle");
       }
     },
-    [agentMode, pushErrorNote, refreshAudit],
+    [agentMode, pushErrorNote, pushInfoNote],
   );
 
   const verifyPaymentCallback = useCallback(
@@ -376,9 +325,8 @@ export function AgentWorkspace({
         setPhase("failed");
         pushErrorNote("Verification request failed. No fulfillment occurred.");
       }
-      void refreshAudit(result.sessionId);
     },
-    [pushErrorNote, refreshAudit],
+    [pushErrorNote],
   );
 
   const openRazorpayCheckout = useCallback(
@@ -443,21 +391,19 @@ export function AgentWorkspace({
           return;
         }
         if (outcome.status === "REJECTED") {
-          setRejection(outcome);
           setPreview(null);
           setPhase("failed");
           return;
         }
         setPreview(outcome);
         setSessionId(outcome.sessionId);
-        void refreshAudit(outcome.sessionId);
       } catch {
         setNotice("Could not add the suggestion. Please retry.");
       } finally {
         setAddOnBusySku(null);
       }
     },
-    [preview, refreshAudit],
+    [preview],
   );
 
   const handleConfirm = useCallback(async () => {
@@ -478,19 +424,15 @@ export function AgentWorkspace({
           setPaymentStage("demo_unavailable");
           setPhase("failed");
         } else {
-          setRejection({ message: outcome.error.message });
           setPhase("failed");
         }
-        void refreshAudit(preview.sessionId);
         return;
       }
 
       if (outcome.status === "REJECTED") {
         setStatusText(null);
-        setRejection(outcome);
         setPreview(null);
         setPhase("failed");
-        void refreshAudit(outcome.sessionId);
         return;
       }
 
@@ -502,185 +444,110 @@ export function AgentWorkspace({
           "Existing secure checkout reused; no duplicate order was created.",
         );
       }
-
-      void refreshAudit(outcome.sessionId);
       setPhase("order_created");
       await openRazorpayCheckout(outcome);
     } catch {
       setStatusText(null);
-      setRejection({
-        message: "Confirmation failed due to a network error. Please retry.",
-      });
       setPhase("failed");
     } finally {
       confirmingRef.current = false;
       setStatusText(null);
     }
-  }, [preview, openRazorpayCheckout, refreshAudit]);
+  }, [openRazorpayCheckout, preview]);
 
   const busy = phase === "parsing" || phase === "previewing";
-  const showWorkspaceColumn =
-    intent !== null || preview !== null || rejection !== null || parseError !== null;
+  const proposalReady = phase === "ready" && preview !== null;
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        {/* Left: conversation panel */}
-        <div className="flex h-[540px] flex-col overflow-hidden rounded-2xl bg-card shadow-card-tinted ring-1 ring-foreground/[0.06]">
-          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
-            <div>
-              <p className="font-display text-sm font-semibold tracking-tight">
-                Agent checkout
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Test mode · nothing is charged without you
-                {mode && (
-                  <span
-                    className={
-                      mode === "fallback"
-                        ? "ml-1.5 font-medium text-amber-700 dark:text-amber-400"
-                        : "ml-1.5 font-medium text-primary"
-                    }
-                  >
-                    · {mode === "fallback" ? "AI fallback" : "LLM parsing"}
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => toggleReadAloud(!readAloud)}
-                aria-pressed={readAloud}
-                title={readAloud ? "Mute reply voice" : "Read replies aloud"}
-                className={cn(
-                  "flex size-7 items-center justify-center rounded-lg border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95",
-                  readAloud
-                    ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {readAloud ? (
-                  <Volume2 className="size-3.5" />
-                ) : (
-                  <VolumeX className="size-3.5" />
-                )}
-                <span className="sr-only">Read replies aloud</span>
-              </button>
-              <Switch
-                id="agent-mode"
-                checked={agentMode}
-                onCheckedChange={setAgentMode}
-              />
-              <Label
-                htmlFor="agent-mode"
-                className="flex items-center gap-1 text-xs font-medium"
-              >
-                <Bot className="size-3.5 text-primary" />
-                Agent mode
-              </Label>
-            </div>
-          </div>
+    <div className="mx-auto flex w-full max-w-2xl flex-col" style={{ minHeight: "calc(100vh - 4rem)" }}>
+      <ChatTranscript
+        entries={transcript}
+        status={statusText}
+        onPickPrompt={(prompt) => void handleSubmit(prompt)}
+      />
 
-          <div className="min-h-0 flex-1">
-            <ChatTranscript
-              entries={transcript}
-              status={statusText}
-              onPickPrompt={(prompt) => void handleSubmit(prompt)}
-            />
-          </div>
+      {proposalReady && !checkoutOpen && preview && (
+        <button
+          type="button"
+          onClick={() => setCheckoutOpen(true)}
+          className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10"
+        >
+          <span>
+            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Proposal ready
+            </span>
+            <span className="text-sm font-semibold tabular-nums">
+              {preview.formattedTotal}
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {preview.items.length} item{preview.items.length === 1 ? "" : "s"} · policy approved
+              </span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
+            <ShieldCheck className="size-3.5" />
+            Review & confirm
+          </span>
+        </button>
+      )}
 
-          <AgentChat onSubmit={handleSubmit} busy={busy} />
-        </div>
+      {notice && <p className="mb-2 text-center text-[11px] text-muted-foreground">{notice}</p>}
 
-        {/* Right: policy decision + checkout */}
-        <div className="space-y-4">
-          {!showWorkspaceColumn && (
-            <Card className="border-dashed shadow-none ring-border">
-              <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-                <ScrollText className="size-8 text-muted-foreground/50" />
-                <p className="text-sm font-medium text-foreground">
-                  Your checkout decision will appear here
-                </p>
-                <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
-                  Server-calculated totals, transparent policy checks, and an
-                  explicit confirmation gate before any payment.
-                </p>
-              </CardContent>
-            </Card>
+      <AgentChat onSubmit={handleSubmit} busy={busy} />
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 pb-2 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <ShieldCheck className="size-3.5 text-primary" />
+          Nothing is charged without your explicit confirmation.
+        </span>
+        <span className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => toggleReadAloud(!readAloud)}
+            aria-pressed={readAloud}
+            title={readAloud ? "Mute reply voice" : "Read replies aloud"}
+            className={cn(
+              "flex size-6 items-center justify-center rounded-md border transition-colors",
+              readAloud
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border bg-background text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {readAloud ? <Volume2 className="size-3" /> : <VolumeX className="size-3" />}
+            <span className="sr-only">Read replies aloud</span>
+          </button>
+          <Switch
+            id="agent-mode"
+            checked={agentMode}
+            onCheckedChange={setAgentMode}
+          />
+          <Label htmlFor="agent-mode" className="flex items-center gap-1 font-medium">
+            <Bot className="size-3.5 text-primary" />
+            Agent mode
+          </Label>
+          {sessionId && (
+            <Link
+              href={`/audit/${sessionId}`}
+              className="font-medium text-indigo-600 hover:underline"
+            >
+              Audit trail
+            </Link>
           )}
-
-          {intent && <IntentCard intent={intent} mode={mode} />}
-
-          {rejection && (
-            <PolicyRejectionList
-              message={rejection.message}
-              suggestedAction={
-                "suggestedAction" in rejection && rejection.suggestedAction
-                  ? rejection.suggestedAction
-                  : "Try one of the suggested prompts."
-              }
-            />
-          )}
-
-          {preview && (
-            <>
-              <PolicyChecklist explanations={preview.policyExplanation} />
-              <CheckoutPreview
-                preview={preview}
-                onConfirm={handleConfirm}
-                confirming={phase === "confirming"}
-                onAddAddOn={handleAddAddOn}
-                addOnBusySku={addOnBusySku}
-              />
-            </>
-          )}
-
-          {notice && (
-            <p className="flex items-center gap-2 rounded-lg border border-primary/25 bg-accent/60 px-3 py-2 text-xs text-accent-foreground">
-              <Info className="size-3.5 shrink-0 text-primary" />
-              {notice}
-            </p>
-          )}
-
-          {paymentStage && (
-            <PaymentStatus
-              stage={paymentStage}
-              confirmResult={confirmResult}
-              failureMessage={failureMessage}
-              sessionId={sessionId}
-            />
-          )}
-        </div>
+        </span>
       </div>
 
-      {/* Recent audit events for the current session */}
-      {sessionId && auditEvents.length > 0 && (
-        <Card className="shadow-card-tinted">
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <History className="size-4 text-primary" />
-                  Session audit trail
-                </CardTitle>
-                <CardDescription>
-                  Hash-chained events — every decision is tamper-evident.
-                </CardDescription>
-              </div>
-              <Button asChild variant="outline" size="sm" className="gap-1.5">
-                <Link href={`/audit/${sessionId}`}>
-                  Full trail
-                  <ArrowRight className="size-3.5" />
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <AuditTimeline events={auditEvents.slice(-6)} compact />
-          </CardContent>
-        </Card>
-      )}
+      <CheckoutDialog
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+        preview={preview}
+        onConfirm={handleConfirm}
+        confirming={phase === "confirming"}
+        onAddAddOn={handleAddAddOn}
+        addOnBusySku={addOnBusySku}
+        paymentStage={paymentStage}
+        confirmResult={confirmResult}
+        failureMessage={failureMessage}
+        sessionId={sessionId}
+      />
     </div>
   );
 }

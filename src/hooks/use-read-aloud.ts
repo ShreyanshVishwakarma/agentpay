@@ -4,18 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "agentpay.read-aloud";
 
+function readStoredPreference(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    // Storage unavailable — default off.
+    return false;
+  }
+}
+
 export function useReadAloud() {
-  const [enabled, setEnabled] = useState(false);
-  const enabledRef = useRef(false);
+  const [enabled, setEnabled] = useState(readStoredPreference);
+  const enabledRef = useRef(enabled);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY) === "1";
-      setEnabled(stored);
-      enabledRef.current = stored;
-    } catch {
-      // Storage unavailable — default off.
-    }
     return () => {
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
