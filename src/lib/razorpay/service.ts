@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { getPolicyConfig } from "@/lib/checkout/policy-engine";
 import {
   RazorpayApiError,
@@ -135,7 +136,7 @@ export async function createRazorpayOrderForSession(
     orderId: order.id,
     amountPaise: order.amount,
     currency: order.currency,
-    keyId: process.env.RAZORPAY_KEY_ID ?? "",
+    keyId: env.RAZORPAY_KEY_ID,
     merchantName: policy.merchantName,
     receipt,
     testMode: true,

@@ -80,10 +80,14 @@ export async function razorpayRequest<T>(
       typeof json.error.description === "string"
         ? json.error.description
         : `HTTP ${response.status}`;
+
+    const isAuthFailure = response.status === 401 || description.toLowerCase().includes("authentication");
     throw new RazorpayApiError(
       response.status,
       `Razorpay API error: ${description}`,
-      "The payment gateway rejected the request. No charge has been made.",
+      isAuthFailure
+        ? "Razorpay authentication failed — Key ID and Secret do not match (HTTP 401). Open Razorpay Dashboard → Test Mode → Settings → API Keys and copy the paired Key ID + Key Secret together, then restart the dev server."
+        : "The payment gateway rejected the request. No charge has been made.",
     );
   }
 
